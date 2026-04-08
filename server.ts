@@ -2,7 +2,7 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
