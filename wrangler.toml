@@ -1,6 +1,11 @@
 # Cloudflare Pages / Workers Configuration
 name = "edumanager"
+main = "src/worker.ts"
 compatibility_date = "2024-04-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
 
 [[d1_databases]]
 binding = "D1"
