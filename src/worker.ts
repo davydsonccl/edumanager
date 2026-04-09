@@ -329,7 +329,7 @@ app.get('/api/health', async (c) => {
       if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
       const { usuario_id, nova_senha } = await c.req.json();
       const hash = bcrypt.hashSync(nova_senha, 10);
-      await await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
+      await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
       return c.json({ success: true });
     });
 
@@ -361,7 +361,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { nome, cnpj, endereco, telefone, email, diretor, secretario } = await c.req.json();
-      db.prepare("UPDATE empresas SET nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, diretor = ?, secretario = ? WHERE id = ?")
+      await db.prepare("UPDATE empresas SET nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, diretor = ?, secretario = ? WHERE id = ?")
         .run(nome, cnpj, endereco, telefone, email, diretor, secretario, c.get('user').empresa_id);
       return c.json({ success: true });
     });
@@ -530,7 +530,7 @@ app.get('/api/health', async (c) => {
       // Check if turma changed to record history
       const currentAluno = await db.prepare("SELECT turma_id FROM alunos WHERE id = ?").get(c.req.param('id')) as any;
       if (currentAluno && currentAluno.turma_id !== parseInt(turma_id)) {
-        db.prepare("INSERT INTO historico_remanejamentos (empresa_id, aluno_id, turma_anterior_id, turma_nova_id, data_remanejamento, motivo) VALUES (?, ?, ?, ?, ?, ?)")
+        await db.prepare("INSERT INTO historico_remanejamentos (empresa_id, aluno_id, turma_anterior_id, turma_nova_id, data_remanejamento, motivo) VALUES (?, ?, ?, ?, ?, ?)")
           .run(c.get('user').empresa_id, c.req.param('id'), currentAluno.turma_id, turma_id, new Date().toISOString(), motivo_remanejamento || 'Remanejamento de turma');
       }
 
@@ -754,7 +754,7 @@ app.get('/api/health', async (c) => {
 
       const { comunicado_id, aluno_id } = await c.req.json();
       const data = new Date().toISOString();
-      db.prepare("INSERT INTO comunicados_lidos (empresa_id, comunicado_id, aluno_id, data_leitura) VALUES (?, ?, ?, ?)").run(c.get('user').empresa_id, comunicado_id, aluno_id, data);
+      await db.prepare("INSERT INTO comunicados_lidos (empresa_id, comunicado_id, aluno_id, data_leitura) VALUES (?, ?, ?, ?)").run(c.get('user').empresa_id, comunicado_id, aluno_id, data);
       return c.json({ success: true });
     });
 
@@ -791,7 +791,7 @@ app.get('/api/health', async (c) => {
 
       const { aluno_id, tipo_documento, observacao } = await c.req.json();
       const data = new Date().toISOString();
-      db.prepare("INSERT INTO solicitacoes_documentos (empresa_id, aluno_id, tipo_documento, data_solicitacao, observacao) VALUES (?, ?, ?, ?, ?)").run(c.get('user').empresa_id, aluno_id, tipo_documento, data, observacao);
+      await db.prepare("INSERT INTO solicitacoes_documentos (empresa_id, aluno_id, tipo_documento, data_solicitacao, observacao) VALUES (?, ?, ?, ?, ?)").run(c.get('user').empresa_id, aluno_id, tipo_documento, data, observacao);
       return c.json({ success: true });
     });
 
@@ -808,7 +808,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const aluno = await db.prepare("SELECT * FROM alunos WHERE id = ? AND empresa_id = ?").get(c.req.param('alunoId'), c.get('user').empresa_id);
-      const notas = db.prepare(`
+      const notas = await db.prepare(`
         SELECT d.nome as disciplina, COALESCE(AVG(n.valor), 0) as media 
         FROM notas n 
         JOIN disciplinas d ON n.disciplina_id = d.id 
