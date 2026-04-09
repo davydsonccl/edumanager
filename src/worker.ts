@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import jwt from 'jsonwebtoken';
+import { sign, verify } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
+
+console.log('Worker starting up...');
 
 const JWT_SECRET = 'SECRET_KEY_EDU_MANAGER';
 
@@ -33,12 +35,25 @@ class DBWrapper {
 const app = new Hono<{ Bindings: { DB: any }, Variables: { user: any } }>();
 app.use('/api/*', cors());
 
+app.onError((err, c) => {
+  console.error('Global Error:', err);
+  return c.json({ 
+    error: 'Erro interno no servidor (Global)', 
+    message: err.message,
+    stack: err.stack 
+  }, 500);
+});
+
+app.notFound((c) => {
+  return c.json({ error: 'Rota não encontrada' }, 404);
+});
+
 const auth = async (c: any, next: any) => {
   const token = c.req.header('authorization')?.split(' ')[1];
   if (!token) return c.json({ error: 'Não autorizado' }, 401);
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = await verify(token, JWT_SECRET, 'HS256');
     c.set('user', decoded);
     await next();
   } catch (err) {
@@ -47,9 +62,21 @@ const auth = async (c: any, next: any) => {
 };
 
 
-app.post('/api/init-db', async (c) => {
+app.get('/api/init-db', async (c) => {
+  console.log('Init DB: Iniciando...');
   const db = new DBWrapper(c.env.DB);
+  if (!c.env.DB) {
+    console.error('Init DB: Binding DB ausente!');
+    return c.json({ error: 'Banco de dados não configurado' }, 500);
+  }
+  
+  const reset = c.req.query('reset') === 'true';
+  
   try {
+    if (reset) {
+      await db.exec("DROP TABLE IF EXISTS empresas; DROP TABLE IF EXISTS usuarios; DROP TABLE IF EXISTS cursos; DROP TABLE IF EXISTS disciplinas; DROP TABLE IF EXISTS turmas; DROP TABLE IF EXISTS permissoes; DROP TABLE IF EXISTS professores; DROP TABLE IF EXISTS matriculas; DROP TABLE IF EXISTS notas; DROP TABLE IF EXISTS frequencias; DROP TABLE IF EXISTS historico_remanejamentos; DROP TABLE IF EXISTS financeiro; DROP TABLE IF EXISTS comunicados; DROP TABLE IF EXISTS comunicados_lidos; DROP TABLE IF EXISTS solicitacoes_documentos;");
+    }
+
     const schema = `
 CREATE TABLE IF NOT EXISTS empresas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -245,7 +272,7 @@ CREATE TABLE IF NOT EXISTS solicitacoes_documentos (
       await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email, diretor, secretario, plano) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .run("Escola EduManager", "00.000.000/0001-00", "Rua das Flores, 123 - Centro", "(11) 99999-9999", "contato@edumanager.com", "Dr. Roberto Silva", "Maria Oliveira", "Premium");
       
-      const hash = bcrypt.hashSync('123', 10);
+      const hash = bcrypt.hashSync('123', 6); // Reduzido para 6 rounds
       await db.prepare("INSERT INTO usuarios (empresa_id, nome, email, senha, perfil) VALUES (?, ?, ?, ?, ?)").run(1, 'Admin', 'admin@admin.com', hash, 'admin');
       
       await db.prepare("INSERT INTO cursos (empresa_id, nome, descricao) VALUES (?, ?, ?)").run(1, 'Ensino Fundamental II', '6º ao 9º ano');
@@ -268,6 +295,33 @@ CREATE TABLE IF NOT EXISTS solicitacoes_documentos (
     return c.json({ error: err.message }, 500);
   }
 });
+app.get('/api/debug-users', async (c) => {
+  try {
+    const db = new DBWrapper(c.env.DB);
+    const users = await db.prepare("SELECT id, nome, email, perfil FROM usuarios").all();
+    return c.json({ count: users.length, users });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.get('/api/test-bcrypt', async (c) => {
+  try {
+    const start = Date.now();
+    const hash = bcrypt.hashSync('test', 10);
+    const ok = bcrypt.compareSync('test', hash);
+    const end = Date.now();
+    return c.json({ 
+      success: true, 
+      ok, 
+      time: `${end - start}ms`,
+      bcryptVersion: 'bcryptjs'
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
@@ -282,46 +336,70 @@ app.get('/api/health', async (c) => {
     });
 
     // API Routes
-   // LOGIN (COM CRIPTOGRAFIA BCRYPT)
+// LOGIN (COM CRIPTOGRAFIA BCRYPT)
 app.post('/api/login', async (c) => {
-  const db = new DBWrapper(c.env.DB);
+  try {
+    const db = new DBWrapper(c.env.DB);
+    if (!c.env.DB) {
+      return c.json({ error: 'Banco de dados não configurado (Binding DB ausente)' }, 500);
+    }
 
-  const { email, senha } = await c.req.json();
+    const body = await c.req.json();
+    const { email, senha } = body;
 
-  const user = await db.prepare(
-    "SELECT * FROM usuarios WHERE email = ?"
-  ).get(email) as any;
+    if (!email || !senha) {
+      return c.json({ error: 'E-mail e senha são obrigatórios' }, 400);
+    }
 
-  if (!user) {
-    return c.json({ error: 'Credenciais inválidas' }, 401);
-  }
+    const user = await db.prepare(
+      "SELECT * FROM usuarios WHERE email = ?"
+    ).get(email) as any;
 
-  const ok = bcrypt.compareSync(senha, user.senha);
-  if (!ok) {
-    return c.json({ error: 'Credenciais inválidas' }, 401);
-  }
+    if (!user) {
+      console.log('Login: Usuário não encontrado:', email);
+      return c.json({ error: 'Credenciais inválidas (Usuário não encontrado)' }, 401);
+    }
 
-  const token = jwt.sign({
-    id: user.id,
-    empresa_id: user.empresa_id,
-    aluno_id: user.aluno_id,
-    professor_id: user.professor_id,
-    nome: user.nome,
-    perfil: user.perfil
-  }, JWT_SECRET);
+    console.log('Login: Comparando senha para:', email);
+    let ok = false;
+    try {
+      ok = bcrypt.compareSync(senha, user.senha);
+    } catch (bcryptErr: any) {
+      console.error('Login: Erro no bcrypt.compareSync:', bcryptErr);
+      return c.json({ error: 'Erro ao verificar senha', details: bcryptErr.message }, 500);
+    }
+    console.log('Login: Resultado comparação:', ok);
+    
+    if (!ok) {
+      return c.json({ error: 'Credenciais inválidas (Senha incorreta)' }, 401);
+    }
 
-  return c.json({
-    token,
-    user: {
+    const token = await sign({
       id: user.id,
-      nome: user.nome,
-      email: user.email,
-      perfil: user.perfil,
+      empresa_id: user.empresa_id,
       aluno_id: user.aluno_id,
       professor_id: user.professor_id,
-      primeiro_acesso: user.primeiro_acesso === 1
-    }
-  });
+      nome: user.nome,
+      perfil: user.perfil,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24h
+    }, JWT_SECRET, 'HS256');
+
+    return c.json({
+      token,
+      user: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        perfil: user.perfil,
+        aluno_id: user.aluno_id,
+        professor_id: user.professor_id,
+        primeiro_acesso: user.primeiro_acesso === 1
+      }
+    });
+  } catch (err: any) {
+    console.error('Login Error:', err);
+    return c.json({ error: 'Erro interno no servidor', details: err.message }, 500);
+  }
 });
 
 

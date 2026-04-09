@@ -257,8 +257,9 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(res.data.user));
         navigate('/dashboard');
       }
-    } catch (err) {
-      alert('Credenciais inválidas');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.details || err.response?.data?.error || 'Credenciais inválidas ou erro no servidor';
+      alert(`Erro: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
