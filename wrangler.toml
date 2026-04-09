@@ -1,0 +1,12 @@
+name = "edumanager"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+main = "src/worker.ts"
+
+[assets]
+directory = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "edumanager-db"
+database_id = "SEU_DATABASE_ID" # Substitua pelo seu database_id gerado no painel do Cloudflare
