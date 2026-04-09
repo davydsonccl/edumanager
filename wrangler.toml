@@ -8,5 +8,5 @@ directory = "dist"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "edumanager-db"
+database_name = "database"
 database_id = "0b2509c0-b49b-4772-9307-5217c6e8e5b8"
