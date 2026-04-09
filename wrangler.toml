@@ -9,4 +9,4 @@ directory = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "edumanager-db"
-database_id = "SEU_DATABASE_ID" # Substitua pelo seu database_id gerado no painel do Cloudflare
+database_id = "0b2509c0-b49b-4772-9307-5217c6e8e5b8"
