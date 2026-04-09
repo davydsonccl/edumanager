@@ -282,8 +282,7 @@ app.get('/api/health', async (c) => {
     });
 
     // API Routes
-    app.post('/api/login', async (c) => {
- app.post('/api/login', async (c) => {
+   app.post('/api/login', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
   const { email, senha } = await c.req.json();
