@@ -1,18 +1,18 @@
+// worker.js
 export default {
   async fetch(request, env) {
-    if (!env.DB) {
-      return new Response("Banco de dados não configurado", { status: 500 });
-    }
-
+    // O banco está acessível em env.database (nome do binding que você criou)
     try {
-      // Exemplo de consulta - ajuste a tabela conforme necessário
-      const { results } = await env.DB.prepare("SELECT * FROM usuarios LIMIT 10").all();
-      
-      return new Response(JSON.stringify(results), {
+      const result = await env.database.prepare("SELECT * FROM usuarios").all();
+      return new Response(JSON.stringify(result), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error) {
-      return new Response(`Erro no banco: ${error.message}`, { status: 500 });
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
     }
   }
-}
+};
+``*
