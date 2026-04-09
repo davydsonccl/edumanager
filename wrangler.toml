@@ -1,0 +1,19 @@
+name = "edumanager"
+main = "worker.js"
+compatibility_date = "2026-03-31"
+
+# Binding do banco de dados (válido para todos os ambientes)
+[[d1_databases]]
+binding = "database"
+database_name = "database"
+database_id = "SEU_DATABASE_ID"
+
+# Ambiente de produção
+[env.production]
+d1_databases = [
+  {
+    binding = "database",
+    database_name = "database",
+    database_id = "0b2509c0-b49b-4772-9307-5217c6e8e5b8"
+  }
+]
