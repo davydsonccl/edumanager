@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "CI=true wrangler dev --port 3000 --ip 0.0.0.0",
+    "dev": "CI=true wrangler dev --ip 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

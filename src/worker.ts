@@ -282,42 +282,18 @@ app.get('/api/health', async (c) => {
     });
 
     // API Routes
-   app.post('/api/login', async (c) => {
+   // LOGIN (SEM CRIPTOGRAFIA)
+app.post('/api/login', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
   const { email, senha } = await c.req.json();
 
-  const emailLimpo = email.trim().toLowerCase();
-  const senhaLimpa = senha.trim();
-
-  const user = await db.prepare(`
-    SELECT * FROM usuarios 
-    WHERE LOWER(TRIM(email)) = ?
-  `).get(emailLimpo);
+  const user = await db.prepare(
+    "SELECT * FROM usuarios WHERE email = ? AND senha = ?"
+  ).get(email, senha) as any;
 
   if (!user) {
-    return c.json({ error: 'Usuário não encontrado' }, 404);
-  }
-
-  let ok = false;
-
-  if (user.senha.startsWith('$2')) {
-    ok = bcrypt.compareSync(senhaLimpa, user.senha);
-  } else {
-    ok = senhaLimpa === user.senha;
-  }
-
-  if (!ok) {
-    return c.json({ error: 'Senha incorreta' }, 401);
-  }
-
-  // 🔐 converte automaticamente para hash
-  if (!user.senha.startsWith('$2')) {
-    const hash = bcrypt.hashSync(senhaLimpa, 10);
-
-    await db.prepare(`
-      UPDATE usuarios SET senha = ? WHERE id = ?
-    `).run(hash, user.id);
+    return c.json({ error: 'Credenciais inválidas' }, 401);
   }
 
   const token = jwt.sign({
@@ -343,22 +319,22 @@ app.get('/api/health', async (c) => {
   });
 });
 
+
+// ALTERAR SENHA (SEM CRIPTOGRAFIA)
 app.post('/api/change-password', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
   const { novaSenha } = await c.req.json();
 
-  const hash = bcrypt.hashSync(novaSenha, 10);
-
-  await db.prepare(`
-    UPDATE usuarios 
-    SET senha = ?, primeiro_acesso = 0 
-    WHERE id = ?
-  `).run(hash, c.get('user').id);
+  await db.prepare(
+    "UPDATE usuarios SET senha = ?, primeiro_acesso = 0 WHERE id = ?"
+  ).run(novaSenha, c.get('user').id);
 
   return c.json({ success: true });
 });
 
+
+// RESETAR SENHA (ADMIN - SEM CRIPTOGRAFIA)
 app.post('/api/usuarios/reset-password', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
@@ -368,17 +344,15 @@ app.post('/api/usuarios/reset-password', auth, async (c) => {
 
   const { usuario_id, nova_senha } = await c.req.json();
 
-  const hash = bcrypt.hashSync(nova_senha, 10);
-
-  await db.prepare(`
-    UPDATE usuarios 
-    SET senha = ?, primeiro_acesso = 1 
-    WHERE id = ?
-  `).run(hash, usuario_id);
+  await db.prepare(
+    "UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?"
+  ).run(nova_senha, usuario_id);
 
   return c.json({ success: true });
 });
 
+
+// CRIAR USUÁRIO (SEM CRIPTOGRAFIA)
 app.post('/api/usuarios/criar', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
@@ -387,8 +361,6 @@ app.post('/api/usuarios/criar', auth, async (c) => {
   }
 
   const { nome, email, senha, perfil, aluno_id, professor_id } = await c.req.json();
-
-  const hash = bcrypt.hashSync(senha, 10);
 
   try {
     const result = await db.prepare(`
@@ -399,10 +371,10 @@ app.post('/api/usuarios/criar', auth, async (c) => {
       c.get('user').empresa_id,
       nome,
       email,
-      hash,
+      senha,
       perfil,
-      aluno_id,
-      professor_id
+      aluno_id || null,
+      professor_id || null
     );
 
     return c.json({ id: result.lastInsertRowid });
