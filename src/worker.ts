@@ -50,235 +50,221 @@ const auth = async (c: any, next: any) => {
 app.post('/api/init-db', async (c) => {
   const db = new DBWrapper(c.env.DB);
   try {
-    // Schema creation
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS empresas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        cnpj TEXT,
-        endereco TEXT,
-        telefone TEXT,
-        email TEXT,
-        diretor TEXT,
-        secretario TEXT,
-        plano TEXT,
-        logo_url TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        professor_id INTEGER,
-        nome TEXT,
-        email TEXT UNIQUE,
-        senha TEXT,
-        perfil TEXT,
-        primeiro_acesso INTEGER DEFAULT 1
-      );
-
-      CREATE TABLE IF NOT EXISTS cursos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        nome TEXT,
-        descricao TEXT,
-        tipo TEXT DEFAULT 'regular'
-      );
-
-      CREATE TABLE IF NOT EXISTS disciplinas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        curso_id INTEGER,
-        nome TEXT,
-        carga_horaria INTEGER,
-        tipo_avaliacao TEXT DEFAULT 'nota'
-      );
-
-      CREATE TABLE IF NOT EXISTS turmas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        curso_id INTEGER,
-        nome TEXT,
-        turno TEXT,
-        capacidade INTEGER,
-        ano_letivo INTEGER
-      );
-
-      CREATE TABLE IF NOT EXISTS alunos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        turma_id INTEGER,
-        nome TEXT,
-        cpf TEXT,
-        rg TEXT,
-        data_nascimento TEXT,
-        cidade_nascimento TEXT,
-        cep TEXT,
-        endereco TEXT,
-        numero TEXT,
-        bairro TEXT,
-        cidade TEXT,
-        estado TEXT,
-        foto TEXT,
-        nome_pai TEXT,
-        nome_mae TEXT,
-        responsavel_legal TEXT,
-        telefone TEXT,
-        email TEXT,
-        problemas_saude TEXT,
-        problemas_saude_outros TEXT,
-        uso_medicamentos INTEGER DEFAULT 0,
-        medicamentos_quais TEXT,
-        status TEXT DEFAULT 'ativo'
-      );
-
-      CREATE TABLE IF NOT EXISTS funcionarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        nome TEXT,
-        cpf TEXT,
-        rg TEXT,
-        cep TEXT,
-        endereco TEXT,
-        numero TEXT,
-        bairro TEXT,
-        cidade TEXT,
-        estado TEXT,
-        telefone TEXT,
-        email TEXT,
-        foto TEXT,
-        cargo TEXT,
-        data_admissao TEXT,
-        status TEXT DEFAULT 'ativo'
-      );
-
-      CREATE TABLE IF NOT EXISTS permissoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        usuario_id INTEGER,
-        tela TEXT,
-        pode_acessar INTEGER DEFAULT 1,
-        pode_editar INTEGER DEFAULT 0,
-        pode_excluir INTEGER DEFAULT 0,
-        pode_backup INTEGER DEFAULT 0
-      );
-
-      CREATE TABLE IF NOT EXISTS professores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        nome TEXT,
-        especialidade TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS matriculas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        turma_id INTEGER,
-        data_matricula TEXT,
-        status TEXT DEFAULT 'ativa'
-      );
-
-      CREATE TABLE IF NOT EXISTS notas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        disciplina_id INTEGER,
-        turma_id INTEGER,
-        bimestre INTEGER,
-        valor REAL,
-        conceito TEXT,
-        observacao TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS frequencias (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        disciplina_id INTEGER,
-        turma_id INTEGER,
-        data TEXT,
-        status TEXT,
-        justificativa TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS historico_remanejamentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        turma_anterior_id INTEGER,
-        turma_nova_id INTEGER,
-        data_remanejamento TEXT,
-        motivo TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS financeiro (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        descricao TEXT,
-        valor REAL,
-        vencimento TEXT,
-        status TEXT,
-        metodo_pagamento TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS comunicados (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        titulo TEXT,
-        conteudo TEXT,
-        data_postagem TEXT,
-        alvo TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS comunicados_lidos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        comunicado_id INTEGER,
-        aluno_id INTEGER,
-        data_leitura TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS solicitacoes_documentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        empresa_id INTEGER,
-        aluno_id INTEGER,
-        tipo_documento TEXT,
-        status TEXT DEFAULT 'pendente',
-        data_solicitacao TEXT,
-        observacao TEXT
-      );
-    `);
+    const schema = `
+CREATE TABLE IF NOT EXISTS empresas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT,
+  cnpj TEXT,
+  endereco TEXT,
+  telefone TEXT,
+  email TEXT,
+  diretor TEXT,
+  secretario TEXT,
+  plano TEXT,
+  logo_url TEXT
+);
+CREATE TABLE IF NOT EXISTS usuarios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  professor_id INTEGER,
+  nome TEXT,
+  email TEXT UNIQUE,
+  senha TEXT,
+  perfil TEXT,
+  primeiro_acesso INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS cursos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  nome TEXT,
+  descricao TEXT,
+  tipo TEXT DEFAULT 'regular'
+);
+CREATE TABLE IF NOT EXISTS disciplinas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  curso_id INTEGER,
+  nome TEXT,
+  carga_horaria INTEGER,
+  tipo_avaliacao TEXT DEFAULT 'nota'
+);
+CREATE TABLE IF NOT EXISTS turmas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  curso_id INTEGER,
+  nome TEXT,
+  turno TEXT,
+  capacidade INTEGER,
+  ano_letivo INTEGER
+);
+CREATE TABLE IF NOT EXISTS alunos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  turma_id INTEGER,
+  nome TEXT,
+  cpf TEXT,
+  rg TEXT,
+  data_nascimento TEXT,
+  cidade_nascimento TEXT,
+  cep TEXT,
+  endereco TEXT,
+  numero TEXT,
+  bairro TEXT,
+  cidade TEXT,
+  estado TEXT,
+  foto TEXT,
+  nome_pai TEXT,
+  nome_mae TEXT,
+  responsavel_legal TEXT,
+  telefone TEXT,
+  email TEXT,
+  problemas_saude TEXT,
+  problemas_saude_outros TEXT,
+  uso_medicamentos INTEGER DEFAULT 0,
+  medicamentos_quais TEXT,
+  status TEXT DEFAULT 'ativo'
+);
+CREATE TABLE IF NOT EXISTS funcionarios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  nome TEXT,
+  cpf TEXT,
+  rg TEXT,
+  cep TEXT,
+  endereco TEXT,
+  numero TEXT,
+  bairro TEXT,
+  cidade TEXT,
+  estado TEXT,
+  telefone TEXT,
+  email TEXT,
+  foto TEXT,
+  cargo TEXT,
+  data_admissao TEXT,
+  status TEXT DEFAULT 'ativo'
+);
+CREATE TABLE IF NOT EXISTS permissoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  usuario_id INTEGER,
+  tela TEXT,
+  pode_acessar INTEGER DEFAULT 1,
+  pode_editar INTEGER DEFAULT 0,
+  pode_excluir INTEGER DEFAULT 0,
+  pode_backup INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS professores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  nome TEXT,
+  especialidade TEXT
+);
+CREATE TABLE IF NOT EXISTS matriculas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  turma_id INTEGER,
+  data_matricula TEXT,
+  status TEXT DEFAULT 'ativa'
+);
+CREATE TABLE IF NOT EXISTS notas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  disciplina_id INTEGER,
+  turma_id INTEGER,
+  bimestre INTEGER,
+  valor REAL,
+  conceito TEXT,
+  observacao TEXT
+);
+CREATE TABLE IF NOT EXISTS frequencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  disciplina_id INTEGER,
+  turma_id INTEGER,
+  data TEXT,
+  status TEXT,
+  justificativa TEXT
+);
+CREATE TABLE IF NOT EXISTS historico_remanejamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  turma_anterior_id INTEGER,
+  turma_nova_id INTEGER,
+  data_remanejamento TEXT,
+  motivo TEXT
+);
+CREATE TABLE IF NOT EXISTS financeiro (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  descricao TEXT,
+  valor REAL,
+  vencimento TEXT,
+  status TEXT,
+  metodo_pagamento TEXT
+);
+CREATE TABLE IF NOT EXISTS comunicados (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  titulo TEXT,
+  conteudo TEXT,
+  data_postagem TEXT,
+  alvo TEXT
+);
+CREATE TABLE IF NOT EXISTS comunicados_lidos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  comunicado_id INTEGER,
+  aluno_id INTEGER,
+  data_leitura TEXT
+);
+CREATE TABLE IF NOT EXISTS solicitacoes_documentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  aluno_id INTEGER,
+  tipo_documento TEXT,
+  status TEXT DEFAULT 'pendente',
+  data_solicitacao TEXT,
+  observacao TEXT
+);
+`;
+    const queries = schema.split(';').map(q => q.replace(/\n/g, ' ').trim()).filter(q => q.length > 0);
+    
+    for (const q of queries) {
+      await db.exec(q);
+    }
 
     // Seed initial data
-    const empresaCount = await await db.prepare("SELECT count(*) as count FROM empresas").get() as any;
+    const empresaCount = await db.prepare("SELECT count(*) as count FROM empresas").get() as any;
     if (empresaCount.count === 0) {
       await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email, diretor, secretario, plano) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .run("Escola EduManager", "00.000.000/0001-00", "Rua das Flores, 123 - Centro", "(11) 99999-9999", "contato@edumanager.com", "Dr. Roberto Silva", "Maria Oliveira", "Premium");
+      
       const hash = bcrypt.hashSync('123', 10);
       await db.prepare("INSERT INTO usuarios (empresa_id, nome, email, senha, perfil) VALUES (?, ?, ?, ?, ?)").run(1, 'Admin', 'admin@admin.com', hash, 'admin');
       
-      // Academic Seed
-      await await db.prepare("INSERT INTO cursos (empresa_id, nome, descricao) VALUES (?, ?, ?)").run(1, 'Ensino Fundamental II', '6º ao 9º ano');
-      await await db.prepare("INSERT INTO disciplinas (empresa_id, curso_id, nome, carga_horaria) VALUES (?, ?, ?, ?)").run(1, 1, 'Matemática', 80);
-      await await db.prepare("INSERT INTO disciplinas (empresa_id, curso_id, nome, carga_horaria) VALUES (?, ?, ?, ?)").run(1, 1, 'Português', 80);
-      await await db.prepare("INSERT INTO turmas (empresa_id, curso_id, nome, turno, capacidade, ano_letivo) VALUES (?, ?, ?, ?, ?, ?)").run(1, 1, '6º Ano A', 'Manhã', 30, 2026);
+      await db.prepare("INSERT INTO cursos (empresa_id, nome, descricao) VALUES (?, ?, ?)").run(1, 'Ensino Fundamental II', '6º ao 9º ano');
+      await db.prepare("INSERT INTO disciplinas (empresa_id, curso_id, nome, carga_horaria) VALUES (?, ?, ?, ?)").run(1, 1, 'Matemática', 80);
+      await db.prepare("INSERT INTO disciplinas (empresa_id, curso_id, nome, carga_horaria) VALUES (?, ?, ?, ?)").run(1, 1, 'Português', 80);
+      await db.prepare("INSERT INTO turmas (empresa_id, curso_id, nome, turno, capacidade, ano_letivo) VALUES (?, ?, ?, ?, ?, ?)").run(1, 1, '6º Ano A', 'Manhã', 30, 2026);
       
-      // Student Seed
-      await await db.prepare("INSERT INTO alunos (empresa_id, nome, cpf, status) VALUES (?, ?, ?, ?)").run(1, "João Silva", "123.456.789-00", 'ativo');
-      await await db.prepare("INSERT INTO usuarios (empresa_id, aluno_id, nome, email, senha, perfil) VALUES (?, ?, ?, ?, ?, ?)").run(1, 1, 'João Silva', 'aluno@aluno.com', hash, 'aluno');
-      await await db.prepare("INSERT INTO matriculas (empresa_id, aluno_id, turma_id, data_matricula) VALUES (?, ?, ?, ?)").run(1, 1, 1, '2026-01-15');
+      await db.prepare("INSERT INTO alunos (empresa_id, nome, cpf, status) VALUES (?, ?, ?, ?)").run(1, "João Silva", "123.456.789-00", 'ativo');
+      await db.prepare("INSERT INTO usuarios (empresa_id, aluno_id, nome, email, senha, perfil) VALUES (?, ?, ?, ?, ?, ?)").run(1, 1, 'João Silva', 'aluno@aluno.com', hash, 'aluno');
+      await db.prepare("INSERT INTO matriculas (empresa_id, aluno_id, turma_id, data_matricula) VALUES (?, ?, ?, ?)").run(1, 1, 1, '2026-01-15');
       
-      // Finance Seed
-      await await db.prepare("INSERT INTO financeiro (empresa_id, aluno_id, descricao, valor, vencimento, status) VALUES (?, ?, ?, ?, ?, ?)").run(1, 1, 'Mensalidade Março', 450.00, '2026-03-10', 'pendente');
+      await db.prepare("INSERT INTO financeiro (empresa_id, aluno_id, descricao, valor, vencimento, status) VALUES (?, ?, ?, ?, ?, ?)").run(1, 1, 'Mensalidade Março', 450.00, '2026-03-10', 'pendente');
       
-      // Communication Seed
-      await await db.prepare("INSERT INTO comunicados (empresa_id, titulo, conteudo, data_postagem, alvo) VALUES (?, ?, ?, ?, ?)").run(1, 'Início das Aulas', 'As aulas começam dia 10 de Fevereiro.', '2026-02-01', 'todos');
+      await db.prepare("INSERT INTO comunicados (empresa_id, titulo, conteudo, data_postagem, alvo) VALUES (?, ?, ?, ?, ?)").run(1, 'Início das Aulas', 'As aulas começam dia 10 de Fevereiro.', '2026-02-01', 'todos');
     }
 
     return c.json({ success: true, message: 'Banco de dados inicializado com sucesso!' });
   } catch (err: any) {
+    console.error('Init DB Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });
@@ -300,7 +286,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { email, senha } = await c.req.json();
-      const user = await await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
+      const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
       if (!user) return c.json({ error: 'Usuário não encontrado' }, 404);
       const ok = bcrypt.compareSync(senha, user.senha);
       if (!ok) return c.json({ error: 'Senha incorreta' }, 401);
@@ -343,7 +329,7 @@ app.get('/api/health', async (c) => {
       if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
       const { usuario_id, nova_senha } = await c.req.json();
       const hash = bcrypt.hashSync(nova_senha, 10);
-      await await await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
+      await await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
       return c.json({ success: true });
     });
 
@@ -354,7 +340,7 @@ app.get('/api/health', async (c) => {
       const { nome, email, senha, perfil, aluno_id, professor_id } = await c.req.json();
       const hash = bcrypt.hashSync(senha, 10);
       try {
-        const result = await await db.prepare(`
+        const result = await db.prepare(`
           INSERT INTO usuarios (empresa_id, nome, email, senha, perfil, aluno_id, professor_id, primeiro_acesso)
           VALUES (?, ?, ?, ?, ?, ?, ?, 1)
         `).run(c.get('user').empresa_id, nome, email, hash, perfil, aluno_id, professor_id);
@@ -367,7 +353,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/empresa', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const row = await await db.prepare("SELECT * FROM empresas WHERE id = ?").get(c.get('user').empresa_id);
+      const row = await db.prepare("SELECT * FROM empresas WHERE id = ?").get(c.get('user').empresa_id);
       return c.json(row);
     });
 
@@ -452,7 +438,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/funcionarios', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare("SELECT * FROM funcionarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
+      const rows = await db.prepare("SELECT * FROM funcionarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
       return c.json(rows);
     });
 
@@ -482,7 +468,7 @@ app.get('/api/health', async (c) => {
         nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
         telefone, email, foto, cargo, data_admissao 
       } = await c.req.json();
-      await await db.prepare(`
+      await db.prepare(`
         UPDATE funcionarios SET 
           nome = ?, cpf = ?, rg = ?, cep = ?, endereco = ?, numero = ?, bairro = ?, cidade = ?, estado = ?, 
           telefone = ?, email = ?, foto = ?, cargo = ?, data_admissao = ?
@@ -498,7 +484,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/permissoes/:usuarioId', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare("SELECT * FROM permissoes WHERE usuario_id = ? AND empresa_id = ?").all(c.req.param('usuarioId'), c.get('user').empresa_id);
+      const rows = await db.prepare("SELECT * FROM permissoes WHERE usuario_id = ? AND empresa_id = ?").all(c.req.param('usuarioId'), c.get('user').empresa_id);
       return c.json(rows);
     });
 
@@ -509,7 +495,7 @@ app.get('/api/health', async (c) => {
       const existing = await db.prepare("SELECT id FROM permissoes WHERE usuario_id = ? AND tela = ? AND empresa_id = ?").get(usuario_id, tela, c.get('user').empresa_id) as any;
       
       if (existing) {
-        await await db.prepare("UPDATE permissoes SET pode_acessar = ?, pode_editar = ?, pode_excluir = ?, pode_backup = ? WHERE id = ?").run(
+        await db.prepare("UPDATE permissoes SET pode_acessar = ?, pode_editar = ?, pode_excluir = ?, pode_backup = ? WHERE id = ?").run(
           pode_acessar ? 1 : 0, 
           pode_editar ? 1 : 0, 
           pode_excluir ? 1 : 0, 
@@ -569,7 +555,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/alunos/:id/historico', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare(`
+      const rows = await db.prepare(`
         SELECT h.*, t1.nome as turma_anterior, t2.nome as turma_nova 
         FROM historico_remanejamentos h
         LEFT JOIN turmas t1 ON h.turma_anterior_id = t1.id
@@ -592,7 +578,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { nome, descricao, tipo } = await c.req.json();
-      await await db.prepare("UPDATE cursos SET nome = ?, descricao = ?, tipo = ? WHERE id = ? AND empresa_id = ?").run(nome, descricao, tipo || 'regular', c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("UPDATE cursos SET nome = ?, descricao = ?, tipo = ? WHERE id = ? AND empresa_id = ?").run(nome, descricao, tipo || 'regular', c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -600,7 +586,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { nome, carga_horaria, curso_id, tipo_avaliacao } = await c.req.json();
-      const result = await await db.prepare("INSERT INTO disciplinas (nome, carga_horaria, curso_id, tipo_avaliacao, empresa_id) VALUES (?, ?, ?, ?, ?)").run(nome, carga_horaria, curso_id, tipo_avaliacao || 'nota', c.get('user').empresa_id);
+      const result = await db.prepare("INSERT INTO disciplinas (nome, carga_horaria, curso_id, tipo_avaliacao, empresa_id) VALUES (?, ?, ?, ?, ?)").run(nome, carga_horaria, curso_id, tipo_avaliacao || 'nota', c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
 
@@ -608,7 +594,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { nome, carga_horaria, curso_id, tipo_avaliacao } = await c.req.json();
-      await await db.prepare("UPDATE disciplinas SET nome = ?, carga_horaria = ?, curso_id = ?, tipo_avaliacao = ? WHERE id = ? AND empresa_id = ?").run(nome, carga_horaria, curso_id, tipo_avaliacao || 'nota', c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("UPDATE disciplinas SET nome = ?, carga_horaria = ?, curso_id = ?, tipo_avaliacao = ? WHERE id = ? AND empresa_id = ?").run(nome, carga_horaria, curso_id, tipo_avaliacao || 'nota', c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -616,7 +602,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { nome, turno, capacidade, ano_letivo, curso_id } = await c.req.json();
-      const result = await await db.prepare("INSERT INTO turmas (nome, turno, capacidade, ano_letivo, curso_id, empresa_id) VALUES (?, ?, ?, ?, ?, ?)").run(nome, turno, capacidade, ano_letivo, curso_id, c.get('user').empresa_id);
+      const result = await db.prepare("INSERT INTO turmas (nome, turno, capacidade, ano_letivo, curso_id, empresa_id) VALUES (?, ?, ?, ?, ?, ?)").run(nome, turno, capacidade, ano_letivo, curso_id, c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
 
@@ -624,7 +610,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { nome, turno, capacidade, ano_letivo, curso_id } = await c.req.json();
-      await await db.prepare("UPDATE turmas SET nome = ?, turno = ?, capacidade = ?, ano_letivo = ?, curso_id = ? WHERE id = ? AND empresa_id = ?").run(nome, turno, capacidade, ano_letivo, curso_id, c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("UPDATE turmas SET nome = ?, turno = ?, capacidade = ?, ano_letivo = ?, curso_id = ? WHERE id = ? AND empresa_id = ?").run(nome, turno, capacidade, ano_letivo, curso_id, c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -633,10 +619,10 @@ app.get('/api/health', async (c) => {
 
       const { aluno_id, turma_id } = await c.req.json();
       const data_matricula = new Date().toISOString().split('T')[0];
-      const result = await await db.prepare("INSERT INTO matriculas (aluno_id, turma_id, data_matricula, empresa_id) VALUES (?, ?, ?, ?)").run(aluno_id, turma_id, data_matricula, c.get('user').empresa_id);
+      const result = await db.prepare("INSERT INTO matriculas (aluno_id, turma_id, data_matricula, empresa_id) VALUES (?, ?, ?, ?)").run(aluno_id, turma_id, data_matricula, c.get('user').empresa_id);
       
       // Update student's turma_id as well
-      await await db.prepare("UPDATE alunos SET turma_id = ? WHERE id = ? AND empresa_id = ?").run(turma_id, aluno_id, c.get('user').empresa_id);
+      await db.prepare("UPDATE alunos SET turma_id = ? WHERE id = ? AND empresa_id = ?").run(turma_id, aluno_id, c.get('user').empresa_id);
       
       return c.json({ id: result.lastInsertRowid });
     });
@@ -646,14 +632,14 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao } = await c.req.json();
-      const result = await await db.prepare("INSERT INTO notas (aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao, c.get('user').empresa_id);
+      const result = await db.prepare("INSERT INTO notas (aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao, c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
 
     app.get('/api/boletim/:alunoId', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare(`
+      const rows = await db.prepare(`
         SELECT n.*, d.nome as disciplina, d.tipo_avaliacao
         FROM notas n 
         JOIN disciplinas d ON n.disciplina_id = d.id 
@@ -673,7 +659,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/frequencia/:alunoId', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare("SELECT * FROM frequencias WHERE aluno_id = ? AND empresa_id = ? ORDER BY data DESC").all(c.req.param('alunoId'), c.get('user').empresa_id);
+      const rows = await db.prepare("SELECT * FROM frequencias WHERE aluno_id = ? AND empresa_id = ? ORDER BY data DESC").all(c.req.param('alunoId'), c.get('user').empresa_id);
       const total = rows.length;
       const presentes = rows.filter((r: any) => r.status === 'P').length;
       const justificadas = rows.filter((r: any) => r.status === 'FJ').length;
@@ -707,14 +693,14 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { status } = await c.req.json();
-      await await db.prepare("UPDATE financeiro SET status = ? WHERE id = ? AND empresa_id = ?").run(status, c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("UPDATE financeiro SET status = ? WHERE id = ? AND empresa_id = ?").run(status, c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
     app.delete('/api/financeiro/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      await await db.prepare("DELETE FROM financeiro WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("DELETE FROM financeiro WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -722,7 +708,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/comunicados', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare("SELECT * FROM comunicados WHERE empresa_id = ? ORDER BY data_postagem DESC").all(c.get('user').empresa_id);
+      const rows = await db.prepare("SELECT * FROM comunicados WHERE empresa_id = ? ORDER BY data_postagem DESC").all(c.get('user').empresa_id);
       return c.json(rows);
     });
 
@@ -739,14 +725,14 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { titulo, conteudo, alvo } = await c.req.json();
-      await await db.prepare("UPDATE comunicados SET titulo = ?, conteudo = ?, alvo = ? WHERE id = ? AND empresa_id = ?").run(titulo, conteudo, alvo || 'todos', c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("UPDATE comunicados SET titulo = ?, conteudo = ?, alvo = ? WHERE id = ? AND empresa_id = ?").run(titulo, conteudo, alvo || 'todos', c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
     app.delete('/api/comunicados/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      await await db.prepare("DELETE FROM comunicados WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("DELETE FROM comunicados WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -775,7 +761,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/comunicados/stats/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await await db.prepare(`
+      const rows = await db.prepare(`
         SELECT a.nome, cl.data_leitura 
         FROM comunicados_lidos cl
         JOIN alunos a ON cl.aluno_id = a.id
@@ -813,7 +799,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const { status } = await c.req.json();
-      await await db.prepare("UPDATE solicitacoes_documentos SET status = ? WHERE id = ? AND empresa_id = ?").run(status, c.req.param('id'), c.get('user').empresa_id);
+      await db.prepare("UPDATE solicitacoes_documentos SET status = ? WHERE id = ? AND empresa_id = ?").run(status, c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
