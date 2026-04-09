@@ -288,7 +288,7 @@ app.get('/api/health', async (c) => {
       const { email, senha } = await c.req.json();
       const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
       if (!user) return c.json({ error: 'Usuário não encontrado' }, 404);
-      const ok = bcrypt.compareSync(senha, user.senha);
+      const ok = senha === user.senha;
       if (!ok) return c.json({ error: 'Senha incorreta' }, 401);
       
       const token = jwt.sign({ 
