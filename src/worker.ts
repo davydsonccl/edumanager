@@ -283,88 +283,164 @@ app.get('/api/health', async (c) => {
 
     // API Routes
     app.post('/api/login', async (c) => {
+ app.post('/api/login', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { email, senha } = await c.req.json();
-      const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
-      if (!user) return c.json({ error: 'Usuário não encontrado' }, 404);
-      const ok = senha === user.senha;
-      if (!ok) return c.json({ error: 'Senha incorreta' }, 401);
-      
-      const token = jwt.sign({ 
-        id: user.id, 
-        empresa_id: user.empresa_id, 
-        aluno_id: user.aluno_id,
-        professor_id: user.professor_id,
-        nome: user.nome, 
-        perfil: user.perfil 
-      }, JWT_SECRET);
-      
-      return c.json({ 
-        token, 
-        user: { 
-          id: user.id,
-          nome: user.nome, 
-          email: user.email, 
-          perfil: user.perfil, 
-          aluno_id: user.aluno_id, 
-          professor_id: user.professor_id,
-          primeiro_acesso: user.primeiro_acesso === 1
-        } 
-      });
-    });
+  const { email, senha } = await c.req.json();
 
-    app.post('/api/change-password', auth, async (c) => {
+  const user = await db.prepare(
+    "SELECT * FROM usuarios WHERE email = ?"
+  ).get(email);
+
+  if (!user) {
+    return c.json({ error: 'Usuário não encontrado' }, 404);
+  }
+
+  let ok = false;
+
+  // 🔥 SUPORTE HÍBRIDO (texto + bcrypt)
+  if (user.senha && user.senha.startsWith('$2')) {
+    ok = bcrypt.compareSync(senha, user.senha);
+  } else {
+    ok = senha === user.senha;
+  }
+
+  if (!ok) {
+    return c.json({ error: 'Senha incorreta' }, 401);
+  }
+
+  // 🔥 MIGRA AUTOMATICAMENTE PARA HASH (se ainda não estiver)
+  if (!user.senha.startsWith('$2')) {
+    const novoHash = bcrypt.hashSync(senha, 10);
+    await db.prepare(`
+      UPDATE usuarios SET senha = ? WHERE id = ?
+    `).run(novoHash, user.id);
+  }
+
+  const token = jwt.sign({
+    id: user.id,
+    empresa_id: user.empresa_id,
+    aluno_id: user.aluno_id,
+    professor_id: user.professor_id,
+    nome: user.nome,
+    perfil: user.perfil
+  }, JWT_SECRET);
+
+  return c.json({
+    token,
+    user: {
+      id: user.id,
+      nome: user.nome,
+      email: user.email,
+      perfil: user.perfil,
+      aluno_id: user.aluno_id,
+      professor_id: user.professor_id,
+      primeiro_acesso: user.primeiro_acesso === 1
+    }
+  });
+});
+
+app.post('/api/change-password', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { novaSenha } = await c.req.json();
-      const hash = bcrypt.hashSync(novaSenha, 10);
-      await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 0 WHERE id = ?").run(hash, c.get('user').id);
-      return c.json({ success: true });
-    });
+  const { novaSenha } = await c.req.json();
 
-    app.post('/api/usuarios/reset-password', auth, async (c) => {
+  const hash = bcrypt.hashSync(novaSenha, 10);
+
+  await db.prepare(`
+    UPDATE usuarios 
+    SET senha = ?, primeiro_acesso = 0 
+    WHERE id = ?
+  `).run(hash, c.get('user').id);
+
+  return c.json({ success: true });
+});
+
+app.post('/api/usuarios/reset-password', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
-      const { usuario_id, nova_senha } = await c.req.json();
-      const hash = bcrypt.hashSync(nova_senha, 10);
-      await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
-      return c.json({ success: true });
-    });
+  if (c.get('user').perfil !== 'admin') {
+    return c.json({ error: 'Acesso negado' }, 403);
+  }
 
-    app.post('/api/usuarios/criar', auth, async (c) => {
+  const { usuario_id, nova_senha } = await c.req.json();
+
+  const hash = bcrypt.hashSync(nova_senha, 10);
+
+  await db.prepare(`
+    UPDATE usuarios 
+    SET senha = ?, primeiro_acesso = 1 
+    WHERE id = ?
+  `).run(hash, usuario_id);
+
+  return c.json({ success: true });
+});
+
+app.post('/api/usuarios/criar', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
-      const { nome, email, senha, perfil, aluno_id, professor_id } = await c.req.json();
-      const hash = bcrypt.hashSync(senha, 10);
-      try {
-        const result = await db.prepare(`
-          INSERT INTO usuarios (empresa_id, nome, email, senha, perfil, aluno_id, professor_id, primeiro_acesso)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-        `).run(c.get('user').empresa_id, nome, email, hash, perfil, aluno_id, professor_id);
-        return c.json({ id: result.lastInsertRowid });
-      } catch (err: any) {
-        return c.json({ error: 'E-mail já cadastrado ou erro no banco' }, 400);
-      }
-    });
+  if (c.get('user').perfil !== 'admin') {
+    return c.json({ error: 'Acesso negado' }, 403);
+  }
 
-    app.get('/api/empresa', auth, async (c) => {
+  const { nome, email, senha, perfil, aluno_id, professor_id } = await c.req.json();
+
+  const hash = bcrypt.hashSync(senha, 10);
+
+  try {
+    const result = await db.prepare(`
+      INSERT INTO usuarios 
+      (empresa_id, nome, email, senha, perfil, aluno_id, professor_id, primeiro_acesso)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+    `).run(
+      c.get('user').empresa_id,
+      nome,
+      email,
+      hash,
+      perfil,
+      aluno_id,
+      professor_id
+    );
+
+    return c.json({ id: result.lastInsertRowid });
+
+  } catch (err) {
+    return c.json({ error: 'E-mail já cadastrado ou erro no banco' }, 400);
+  }
+});
+
+app.get('/api/empresa', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const row = await db.prepare("SELECT * FROM empresas WHERE id = ?").get(c.get('user').empresa_id);
-      return c.json(row);
-    });
+  const row = await db.prepare(
+    "SELECT * FROM empresas WHERE id = ?"
+  ).get(c.get('user').empresa_id);
 
-    app.post('/api/empresa', auth, async (c) => {
+  return c.json(row);
+});
+
+app.post('/api/empresa', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { nome, cnpj, endereco, telefone, email, diretor, secretario } = await c.req.json();
-      await db.prepare("UPDATE empresas SET nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, diretor = ?, secretario = ? WHERE id = ?")
-        .run(nome, cnpj, endereco, telefone, email, diretor, secretario, c.get('user').empresa_id);
-      return c.json({ success: true });
-    });
+  const { nome, cnpj, endereco, telefone, email, diretor, secretario } = await c.req.json();
+
+  await db.prepare(`
+    UPDATE empresas 
+    SET nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, diretor = ?, secretario = ?
+    WHERE id = ?
+  `).run(
+    nome,
+    cnpj,
+    endereco,
+    telefone,
+    email,
+    diretor,
+    secretario,
+    c.get('user').empresa_id
+  );
+
+  return c.json({ success: true });
+});
 
     // Academic Endpoints
     app.get('/api/cursos', auth, async (c) => {
