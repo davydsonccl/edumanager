@@ -287,9 +287,13 @@ app.get('/api/health', async (c) => {
 
   const { email, senha } = await c.req.json();
 
-  const user = await db.prepare(
-    "SELECT * FROM usuarios WHERE email = ?"
-  ).get(email);
+  const emailLimpo = email.trim().toLowerCase();
+  const senhaLimpa = senha.trim();
+
+  const user = await db.prepare(`
+    SELECT * FROM usuarios 
+    WHERE LOWER(TRIM(email)) = ?
+  `).get(emailLimpo);
 
   if (!user) {
     return c.json({ error: 'Usuário não encontrado' }, 404);
@@ -297,23 +301,23 @@ app.get('/api/health', async (c) => {
 
   let ok = false;
 
-  // 🔥 SUPORTE HÍBRIDO (texto + bcrypt)
-  if (user.senha && user.senha.startsWith('$2')) {
-    ok = bcrypt.compareSync(senha, user.senha);
+  if (user.senha.startsWith('$2')) {
+    ok = bcrypt.compareSync(senhaLimpa, user.senha);
   } else {
-    ok = senha === user.senha;
+    ok = senhaLimpa === user.senha;
   }
 
   if (!ok) {
     return c.json({ error: 'Senha incorreta' }, 401);
   }
 
-  // 🔥 MIGRA AUTOMATICAMENTE PARA HASH (se ainda não estiver)
+  // 🔐 converte automaticamente para hash
   if (!user.senha.startsWith('$2')) {
-    const novoHash = bcrypt.hashSync(senha, 10);
+    const hash = bcrypt.hashSync(senhaLimpa, 10);
+
     await db.prepare(`
       UPDATE usuarios SET senha = ? WHERE id = ?
-    `).run(novoHash, user.id);
+    `).run(hash, user.id);
   }
 
   const token = jwt.sign({
