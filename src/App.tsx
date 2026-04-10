@@ -2780,8 +2780,9 @@ const Alunos = () => {
         email_responsavel: ''
       });
       fetchAlunos();
-    } catch (err) {
-      alert('Erro ao salvar aluno');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || err.message;
+      alert(`Erro ao salvar aluno: ${errorMsg}`);
     }
   };
 

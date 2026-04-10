@@ -12,26 +12,61 @@ class DBWrapper {
     const stmt = this.d1.prepare(query);
     return {
       get: async (...params: any[]) => {
-        return await stmt.bind(...params).first();
+        try {
+          return await stmt.bind(...params).first();
+        } catch (e: any) {
+          console.error(`DB Error (get): ${e.message} | Query: ${query}`);
+          throw e;
+        }
       },
       all: async (...params: any[]) => {
-        const res = await stmt.bind(...params).all();
-        return res.results;
+        try {
+          const res = await stmt.bind(...params).all();
+          return res.results;
+        } catch (e: any) {
+          console.error(`DB Error (all): ${e.message} | Query: ${query}`);
+          throw e;
+        }
       },
       run: async (...params: any[]) => {
-        const res = await stmt.bind(...params).run();
-        return { lastInsertRowid: res.meta.last_row_id };
+        try {
+          const res = await stmt.bind(...params).run();
+          return { lastInsertRowid: res.meta.last_row_id };
+        } catch (e: any) {
+          console.error(`DB Error (run): ${e.message} | Query: ${query}`);
+          throw e;
+        }
       }
     };
   }
   
   async exec(query: string) {
-    await this.d1.exec(query);
+    try {
+      await this.d1.exec(query);
+    } catch (e: any) {
+      console.error(`DB Error (exec): ${e.message} | Query: ${query}`);
+      throw e;
+    }
   }
 }
 
 const app = new Hono<{ Bindings: { DB: any }, Variables: { user: any } }>();
 app.use('/api/*', cors());
+
+const toInt = (val: any) => {
+  if (val === undefined || val === null || val === '') return null;
+  const parsed = parseInt(val);
+  return isNaN(parsed) ? null : parsed;
+};
+
+app.onError((err, c) => {
+  console.error(`Error: ${err.message}`);
+  return c.json({ 
+    error: err.message,
+    stack: err.stack,
+    cause: err.cause
+  }, 500);
+});
 
 const auth = async (c: any, next: any) => {
   const token = c.req.header('authorization')?.split(' ')[1];
@@ -261,24 +296,18 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
   observacao TEXT
 );
 `;
-    const queries = schema.split(';').map(q => q.replace(/\n/g, ' ').trim()).filter(q => q.length > 0);
+    const queries = schema.split(';').map(q => q.trim()).filter(q => q.length > 0);
     
     for (const q of queries) {
-      await db.exec(q);
+      try {
+        await db.exec(q);
+      } catch (e: any) {
+        console.error(`Init DB Query Error: ${e.message} | Query: ${q}`);
+      }
     }
 
-    // Migrations for existing tables
-    try { await db.exec("ALTER TABLE alunos ADD COLUMN posicao_sala INTEGER"); } catch(e) {}
-    try { await db.exec("ALTER TABLE alunos ADD COLUMN fileira INTEGER"); } catch(e) {}
-    try { await db.exec("ALTER TABLE alunos ADD COLUMN assento INTEGER"); } catch(e) {}
-    try { await db.exec("ALTER TABLE alunos ADD COLUMN whatsapp_responsavel TEXT"); } catch(e) {}
-    try { await db.exec("ALTER TABLE funcionarios ADD COLUMN disciplina_id INTEGER"); } catch(e) {}
-    try { await db.exec("ALTER TABLE funcionarios ADD COLUMN turma_id INTEGER"); } catch(e) {}
-    try { await db.exec("ALTER TABLE empresas ADD COLUMN msg_cobranca_whatsapp TEXT"); } catch(e) {}
-    try { await db.exec("ALTER TABLE empresas ADD COLUMN msg_cobranca_email TEXT"); } catch(e) {}
-    try { await db.exec("ALTER TABLE notas ADD COLUMN conceito TEXT"); } catch(e) {}
-    try { await db.exec("ALTER TABLE notas ADD COLUMN observacao TEXT"); } catch(e) {}
-    try { await db.exec("ALTER TABLE alunos ADD COLUMN email_responsavel TEXT"); } catch(e) {}
+    // Migrations for existing tables (redundant as they are in CREATE TABLE above)
+    // Removed to avoid duplicate column errors in logs
 
     // Seed initial data
     const empresaCount = await db.prepare("SELECT count(*) as count FROM empresas").get() as any;
@@ -380,7 +409,14 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
-      const { nome, email, senha, perfil, aluno_id, professor_id, curso_id, turma_id, ano_letivo } = await c.req.json();
+      const data = await c.req.json();
+      const { nome, email, senha, perfil } = data;
+      const aluno_id = toInt(data.aluno_id);
+      const professor_id = toInt(data.professor_id);
+      const curso_id = toInt(data.curso_id);
+      const turma_id = toInt(data.turma_id);
+      const ano_letivo = toInt(data.ano_letivo);
+
       const hash = bcrypt.hashSync(senha, 10);
       try {
         const result = await db.prepare(`
@@ -389,14 +425,19 @@ app.get('/api/health', async (c) => {
         `).run(c.get('user').empresa_id, nome, email, hash, perfil, aluno_id, professor_id, curso_id, turma_id, ano_letivo);
         return c.json({ id: result.lastInsertRowid });
       } catch (err: any) {
-        return c.json({ error: 'E-mail já cadastrado ou erro no banco' }, 400);
+        return c.json({ error: 'E-mail já cadastrado ou erro no banco: ' + err.message }, 400);
       }
     });
 
     app.put('/api/usuarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
-      const { nome, email, perfil, curso_id, turma_id, ano_letivo, status } = await c.req.json();
+      const data = await c.req.json();
+      const { nome, email, perfil, status } = data;
+      const curso_id = toInt(data.curso_id);
+      const turma_id = toInt(data.turma_id);
+      const ano_letivo = toInt(data.ano_letivo);
+
       await db.prepare(`
         UPDATE usuarios SET nome = ?, email = ?, perfil = ?, curso_id = ?, turma_id = ?, ano_letivo = ?, status = ?
         WHERE id = ? AND empresa_id = ?
@@ -470,14 +511,20 @@ app.get('/api/health', async (c) => {
     app.post('/api/alunos', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
+      const data = await c.req.json();
       const { 
         nome, cpf, rg, data_nascimento, cidade_nascimento, 
         cep, endereco, numero, bairro, cidade, estado, 
         foto, nome_pai, nome_mae, responsavel_legal, 
         telefone, email, problemas_saude, problemas_saude_outros,
-        uso_medicamentos, medicamentos_quais, turma_id, posicao_sala,
-        fileira, assento, whatsapp_responsavel, email_responsavel
-      } = await c.req.json();
+        uso_medicamentos, medicamentos_quais, whatsapp_responsavel, email_responsavel
+      } = data;
+      
+      const turma_id = toInt(data.turma_id);
+      const posicao_sala = toInt(data.posicao_sala);
+      const fileira = toInt(data.fileira);
+      const assento = toInt(data.assento);
+
       const result = await db.prepare(`
         INSERT INTO alunos (
           nome, cpf, rg, data_nascimento, cidade_nascimento, 
@@ -509,10 +556,15 @@ app.get('/api/health', async (c) => {
     app.post('/api/funcionarios', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
+      const data = await c.req.json();
       const { 
         nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
-        telefone, email, foto, cargo, data_admissao, disciplina_id, turma_id 
-      } = await c.req.json();
+        telefone, email, foto, cargo, data_admissao
+      } = data;
+      
+      const disciplina_id = toInt(data.disciplina_id);
+      const turma_id = toInt(data.turma_id);
+
       const result = await db.prepare(`
         INSERT INTO funcionarios (
           nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
@@ -528,10 +580,15 @@ app.get('/api/health', async (c) => {
     app.post('/api/funcionarios/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
+      const data = await c.req.json();
       const { 
         nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
-        telefone, email, foto, cargo, data_admissao, disciplina_id, turma_id 
-      } = await c.req.json();
+        telefone, email, foto, cargo, data_admissao
+      } = data;
+      
+      const disciplina_id = toInt(data.disciplina_id);
+      const turma_id = toInt(data.turma_id);
+
       await db.prepare(`
         UPDATE funcionarios SET 
           nome = ?, cpf = ?, rg = ?, cep = ?, endereco = ?, numero = ?, bairro = ?, cidade = ?, estado = ?, 
@@ -589,18 +646,23 @@ app.get('/api/health', async (c) => {
     app.post('/api/alunos/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
+      const data = await c.req.json();
       const { 
         nome, cpf, rg, data_nascimento, cidade_nascimento, 
         cep, endereco, numero, bairro, cidade, estado, 
         foto, nome_pai, nome_mae, responsavel_legal, 
         telefone, email, problemas_saude, problemas_saude_outros,
-        uso_medicamentos, medicamentos_quais, turma_id, posicao_sala, 
-        fileira, assento, whatsapp_responsavel, email_responsavel, motivo_remanejamento 
-      } = await c.req.json();
+        uso_medicamentos, medicamentos_quais, whatsapp_responsavel, email_responsavel, motivo_remanejamento 
+      } = data;
+      
+      const turma_id = toInt(data.turma_id);
+      const posicao_sala = toInt(data.posicao_sala);
+      const fileira = toInt(data.fileira);
+      const assento = toInt(data.assento);
       
       // Check if turma changed to record history
       const currentAluno = await db.prepare("SELECT turma_id FROM alunos WHERE id = ?").get(c.req.param('id')) as any;
-      if (currentAluno && currentAluno.turma_id !== parseInt(turma_id)) {
+      if (currentAluno && currentAluno.turma_id !== turma_id) {
         await db.prepare("INSERT INTO historico_remanejamentos (empresa_id, aluno_id, turma_anterior_id, turma_nova_id, data_remanejamento, motivo) VALUES (?, ?, ?, ?, ?, ?)")
           .run(c.get('user').empresa_id, c.req.param('id'), currentAluno.turma_id, turma_id, new Date().toISOString(), motivo_remanejamento || 'Remanejamento de turma');
       }
@@ -688,7 +750,11 @@ app.get('/api/health', async (c) => {
     app.post('/api/disciplinas', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { nome, carga_horaria, curso_id, tipo_avaliacao } = await c.req.json();
+      const data = await c.req.json();
+      const { nome, tipo_avaliacao } = data;
+      const carga_horaria = toInt(data.carga_horaria);
+      const curso_id = toInt(data.curso_id);
+
       const result = await db.prepare("INSERT INTO disciplinas (nome, carga_horaria, curso_id, tipo_avaliacao, empresa_id) VALUES (?, ?, ?, ?, ?)").run(nome, carga_horaria, curso_id, tipo_avaliacao || 'nota', c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
@@ -696,7 +762,11 @@ app.get('/api/health', async (c) => {
     app.post('/api/disciplinas/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { nome, carga_horaria, curso_id, tipo_avaliacao } = await c.req.json();
+      const data = await c.req.json();
+      const { nome, tipo_avaliacao } = data;
+      const carga_horaria = toInt(data.carga_horaria);
+      const curso_id = toInt(data.curso_id);
+
       await db.prepare("UPDATE disciplinas SET nome = ?, carga_horaria = ?, curso_id = ?, tipo_avaliacao = ? WHERE id = ? AND empresa_id = ?").run(nome, carga_horaria, curso_id, tipo_avaliacao || 'nota', c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
@@ -704,7 +774,12 @@ app.get('/api/health', async (c) => {
     app.post('/api/turmas', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { nome, turno, capacidade, ano_letivo, curso_id } = await c.req.json();
+      const data = await c.req.json();
+      const { nome, turno } = data;
+      const capacidade = toInt(data.capacidade);
+      const ano_letivo = toInt(data.ano_letivo);
+      const curso_id = toInt(data.curso_id);
+
       const result = await db.prepare("INSERT INTO turmas (nome, turno, capacidade, ano_letivo, curso_id, empresa_id) VALUES (?, ?, ?, ?, ?, ?)").run(nome, turno, capacidade, ano_letivo, curso_id, c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
@@ -712,7 +787,12 @@ app.get('/api/health', async (c) => {
     app.post('/api/turmas/:id', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { nome, turno, capacidade, ano_letivo, curso_id } = await c.req.json();
+      const data = await c.req.json();
+      const { nome, turno } = data;
+      const capacidade = toInt(data.capacidade);
+      const ano_letivo = toInt(data.ano_letivo);
+      const curso_id = toInt(data.curso_id);
+
       await db.prepare("UPDATE turmas SET nome = ?, turno = ?, capacidade = ?, ano_letivo = ?, curso_id = ? WHERE id = ? AND empresa_id = ?").run(nome, turno, capacidade, ano_letivo, curso_id, c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
     });
@@ -720,7 +800,10 @@ app.get('/api/health', async (c) => {
     app.post('/api/matriculas', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { aluno_id, turma_id } = await c.req.json();
+      const data = await c.req.json();
+      const aluno_id = toInt(data.aluno_id);
+      const turma_id = toInt(data.turma_id);
+
       const data_matricula = new Date().toISOString().split('T')[0];
       const result = await db.prepare("INSERT INTO matriculas (aluno_id, turma_id, data_matricula, empresa_id) VALUES (?, ?, ?, ?)").run(aluno_id, turma_id, data_matricula, c.get('user').empresa_id);
       
@@ -752,7 +835,14 @@ app.get('/api/health', async (c) => {
     app.post('/api/notas', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao } = await c.req.json();
+      const data = await c.req.json();
+      const { conceito, observacao } = data;
+      const aluno_id = toInt(data.aluno_id);
+      const disciplina_id = toInt(data.disciplina_id);
+      const turma_id = toInt(data.turma_id);
+      const bimestre = toInt(data.bimestre);
+      const valor = data.valor ? parseFloat(data.valor) : null;
+
       const result = await db.prepare("INSERT INTO notas (aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(aluno_id, disciplina_id, turma_id, bimestre, valor, conceito, observacao, c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
@@ -873,7 +963,11 @@ app.get('/api/health', async (c) => {
     app.post('/api/financeiro', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { aluno_id, valor, vencimento, status, descricao } = await c.req.json();
+      const data = await c.req.json();
+      const { status, descricao, vencimento } = data;
+      const aluno_id = toInt(data.aluno_id);
+      const valor = data.valor ? parseFloat(data.valor) : 0;
+
       const result = await db.prepare("INSERT INTO financeiro (aluno_id, valor, vencimento, status, descricao, empresa_id) VALUES (?, ?, ?, ?, ?, ?)").run(aluno_id, valor, vencimento, status, descricao || 'Mensalidade', c.get('user').empresa_id);
       return c.json({ id: result.lastInsertRowid });
     });
