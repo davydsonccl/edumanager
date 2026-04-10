@@ -2665,6 +2665,7 @@ const Alunos = () => {
     nome_mae: '',
     responsavel_legal: '',
     whatsapp_responsavel: '',
+    email_responsavel: '',
     telefone: '',
     email: '',
     problemas_saude: [],
@@ -2738,7 +2739,8 @@ const Alunos = () => {
         telefone: '', email: '', problemas_saude: [], 
         problemas_saude_outros: '', uso_medicamentos: false, medicamentos_quais: '',
         turma_id: '', fileira: '', assento: '',
-        whatsapp_pais_codigo: '+55', whatsapp_ddd: '', whatsapp_numero: ''
+        whatsapp_pais_codigo: '+55', whatsapp_ddd: '', whatsapp_numero: '',
+        email_responsavel: ''
       });
       fetchAlunos();
     } catch (err) {
@@ -2787,7 +2789,7 @@ const Alunos = () => {
               foto: '', nome_pai: '', nome_mae: '', responsavel_legal: '',
               telefone: '', email: '', problemas_saude: [], 
               problemas_saude_outros: '', uso_medicamentos: false, medicamentos_quais: '',
-              turma_id: ''
+              turma_id: '', email_responsavel: ''
             });
             setShowModal(true);
           }}
@@ -3198,6 +3200,16 @@ const Alunos = () => {
                         />
                       </div>
                     </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">E-mail Responsável</label>
+                      <input
+                        type="email"
+                        value={formData.email_responsavel || ''}
+                        onChange={(e) => setFormData({ ...formData, email_responsavel: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="email@responsavel.com"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -3532,7 +3544,7 @@ const Funcionarios = () => {
             endereco: res.data.logradouro,
             bairro: res.data.bairro,
             cidade: res.data.localidade,
-            uf: res.data.uf
+            estado: res.data.uf
           });
         }
       } catch (err) {
@@ -3765,11 +3777,70 @@ const Funcionarios = () => {
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Endereço</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Logradouro</label>
                     <input
                       type="text"
                       value={formData.endereco || ''}
                       onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="col-span-2 grid grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Número</label>
+                    <input
+                      type="text"
+                      value={formData.numero || ''}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Bairro</label>
+                    <input
+                      type="text"
+                      value={formData.bairro || ''}
+                      onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Cidade</label>
+                    <input
+                      type="text"
+                      value={formData.cidade || ''}
+                      onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">UF</label>
+                    <input
+                      type="text"
+                      value={formData.estado || ''}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      maxLength={2}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-6 col-span-2">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Telefone</label>
+                    <input
+                      type="text"
+                      value={formData.telefone || ''}
+                      onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">E-mail</label>
+                    <input
+                      type="email"
+                      value={formData.email || ''}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
@@ -4803,7 +4874,8 @@ const Financeiro = () => {
       if (type === 'whatsapp') {
         const phone = aluno.telefone?.replace(/\D/g, '');
         if (phone) {
-          window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message || 'Lembrete de pagamento')}`, '_blank');
+          const finalPhone = phone.startsWith('55') ? phone : `55${phone}`;
+          window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(message || 'Lembrete de pagamento')}`, '_blank');
         } else {
           alert('Telefone não cadastrado');
         }
@@ -4922,14 +4994,28 @@ const Financeiro = () => {
                         {p.status !== 'pago' && p.status !== 'estornado' && (
                           <>
                             <button 
-                              onClick={() => handleSendReminder({ nome: p.aluno_nome, telefone: p.aluno_telefone, email: p.aluno_email, valor_pendente: p.valor.toFixed(2) }, 'whatsapp')}
+                              onClick={() => handleSendReminder({ 
+                                nome: p.aluno_nome, 
+                                telefone: p.aluno_telefone, 
+                                email: p.aluno_email, 
+                                responsavel_legal: p.responsavel_legal,
+                                nome_mae: p.nome_mae,
+                                valor_pendente: p.valor.toFixed(2) 
+                              }, 'whatsapp')}
                               className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                               title="Enviar lembrete WhatsApp"
                             >
                               <MessageCircle size={18} />
                             </button>
                             <button 
-                              onClick={() => handleSendReminder({ nome: p.aluno_nome, telefone: p.aluno_telefone, email: p.aluno_email, valor_pendente: p.valor.toFixed(2) }, 'email')}
+                              onClick={() => handleSendReminder({ 
+                                nome: p.aluno_nome, 
+                                telefone: p.aluno_telefone, 
+                                email: p.aluno_email, 
+                                responsavel_legal: p.responsavel_legal,
+                                nome_mae: p.nome_mae,
+                                valor_pendente: p.valor.toFixed(2) 
+                              }, 'email')}
                               className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                               title="Enviar lembrete E-mail"
                             >

@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS alunos (
   nome_mae TEXT,
   responsavel_legal TEXT,
   whatsapp_responsavel TEXT,
+  email_responsavel TEXT,
   telefone TEXT,
   email TEXT,
   problemas_saude TEXT,
@@ -276,6 +277,7 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
     try { await db.exec("ALTER TABLE empresas ADD COLUMN msg_cobranca_email TEXT"); } catch(e) {}
     try { await db.exec("ALTER TABLE notas ADD COLUMN conceito TEXT"); } catch(e) {}
     try { await db.exec("ALTER TABLE notas ADD COLUMN observacao TEXT"); } catch(e) {}
+    try { await db.exec("ALTER TABLE alunos ADD COLUMN email_responsavel TEXT"); } catch(e) {}
 
     // Seed initial data
     const empresaCount = await db.prepare("SELECT count(*) as count FROM empresas").get() as any;
@@ -473,7 +475,7 @@ app.get('/api/health', async (c) => {
         foto, nome_pai, nome_mae, responsavel_legal, 
         telefone, email, problemas_saude, problemas_saude_outros,
         uso_medicamentos, medicamentos_quais, turma_id, posicao_sala,
-        fileira, assento, whatsapp_responsavel
+        fileira, assento, whatsapp_responsavel, email_responsavel
       } = await c.req.json();
       const result = await db.prepare(`
         INSERT INTO alunos (
@@ -482,15 +484,15 @@ app.get('/api/health', async (c) => {
           foto, nome_pai, nome_mae, responsavel_legal, 
           telefone, email, problemas_saude, problemas_saude_outros,
           uso_medicamentos, medicamentos_quais, turma_id, posicao_sala, 
-          fileira, assento, whatsapp_responsavel, empresa_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          fileira, assento, whatsapp_responsavel, email_responsavel, empresa_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         nome, cpf, rg, data_nascimento, cidade_nascimento, 
         cep, endereco, numero, bairro, cidade, estado, 
         foto, nome_pai, nome_mae, responsavel_legal, 
         telefone, email, JSON.stringify(problemas_saude || []), problemas_saude_outros,
         uso_medicamentos ? 1 : 0, medicamentos_quais, turma_id, posicao_sala,
-        fileira, assento, whatsapp_responsavel, c.get('user').empresa_id
+        fileira, assento, whatsapp_responsavel, email_responsavel, c.get('user').empresa_id
       );
       return c.json({ id: result.lastInsertRowid });
     });
@@ -592,7 +594,7 @@ app.get('/api/health', async (c) => {
         foto, nome_pai, nome_mae, responsavel_legal, 
         telefone, email, problemas_saude, problemas_saude_outros,
         uso_medicamentos, medicamentos_quais, turma_id, posicao_sala, 
-        fileira, assento, whatsapp_responsavel, motivo_remanejamento 
+        fileira, assento, whatsapp_responsavel, email_responsavel, motivo_remanejamento 
       } = await c.req.json();
       
       // Check if turma changed to record history
@@ -609,7 +611,7 @@ app.get('/api/health', async (c) => {
           foto = ?, nome_pai = ?, nome_mae = ?, responsavel_legal = ?, 
           telefone = ?, email = ?, problemas_saude = ?, problemas_saude_outros = ?,
           uso_medicamentos = ?, medicamentos_quais = ?, turma_id = ?, posicao_sala = ?,
-          fileira = ?, assento = ?, whatsapp_responsavel = ?
+          fileira = ?, assento = ?, whatsapp_responsavel = ?, email_responsavel = ?
         WHERE id = ? AND empresa_id = ?
       `).run(
         nome, cpf, rg, data_nascimento, cidade_nascimento, 
@@ -617,7 +619,7 @@ app.get('/api/health', async (c) => {
         foto, nome_pai, nome_mae, responsavel_legal, 
         telefone, email, JSON.stringify(problemas_saude || []), problemas_saude_outros,
         uso_medicamentos ? 1 : 0, medicamentos_quais, turma_id, posicao_sala,
-        fileira, assento, whatsapp_responsavel, c.req.param('id'), c.get('user').empresa_id
+        fileira, assento, whatsapp_responsavel, email_responsavel, c.req.param('id'), c.get('user').empresa_id
       );
       return c.json({ success: true });
     });
@@ -840,7 +842,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const rows = await db.prepare(`
-        SELECT f.*, a.nome as aluno_nome 
+        SELECT f.*, a.nome as aluno_nome, a.whatsapp_responsavel as aluno_telefone, a.email_responsavel as aluno_email, a.responsavel_legal, a.nome_mae 
         FROM financeiro f 
         JOIN alunos a ON f.aluno_id = a.id 
         WHERE f.empresa_id = ?`).all(c.get('user').empresa_id);
