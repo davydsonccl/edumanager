@@ -38,7 +38,10 @@ import {
   Database,
   Shield,
   Award,
-  Key
+  Key,
+  Map,
+  MessageCircle,
+  Mail
 } from 'lucide-react';
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -179,6 +182,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           {hasAccess('Alunos') && <SidebarItem to="/alunos" icon={Users} label="Alunos" active={location.pathname === '/alunos'} />}
           {hasAccess('Acadêmico') && <SidebarItem to="/academic" icon={BookOpen} label="Acadêmico" active={location.pathname === '/academic'} />}
           {hasAccess('Professor') && <SidebarItem to="/professor" icon={GraduationCap} label="Professor" active={location.pathname === '/professor'} />}
+          {hasAccess('Mapa de Sala') && <SidebarItem to="/mapa-sala" icon={Map} label="Mapa de Sala" active={location.pathname === '/mapa-sala'} />}
           {hasAccess('Funcionários') && <SidebarItem to="/funcionarios" icon={Briefcase} label="Funcionários" active={location.pathname === '/funcionarios'} />}
           {hasAccess('Financeiro') && <SidebarItem to="/financeiro" icon={DollarSign} label="Financeiro" active={location.pathname === '/financeiro'} />}
           {hasAccess('Comunicação') && <SidebarItem to="/comunicacao" icon={MessageSquare} label="Comunicação" active={location.pathname === '/comunicacao'} />}
@@ -917,6 +921,39 @@ const Academic = () => {
     }
   };
 
+  const handleDeleteCurso = async (id: number) => {
+    if (confirm('Deseja realmente excluir este curso?')) {
+      try {
+        await api.delete(`/cursos/${id}`);
+        fetchData();
+      } catch (err) {
+        alert('Erro ao excluir curso');
+      }
+    }
+  };
+
+  const handleDeleteDisciplina = async (id: number) => {
+    if (confirm('Deseja realmente excluir esta disciplina?')) {
+      try {
+        await api.delete(`/disciplinas/${id}`);
+        fetchData();
+      } catch (err) {
+        alert('Erro ao excluir disciplina');
+      }
+    }
+  };
+
+  const handleDeleteTurma = async (id: number) => {
+    if (confirm('Deseja realmente excluir esta turma?')) {
+      try {
+        await api.delete(`/turmas/${id}`);
+        fetchData();
+      } catch (err) {
+        alert('Erro ao excluir turma');
+      }
+    }
+  };
+
   return (
     <div className="space-y-10">
       <header className="flex justify-between items-end">
@@ -970,7 +1007,10 @@ const Academic = () => {
                   <td className="px-8 py-6 font-bold text-slate-700">{c.nome}</td>
                   <td className="px-8 py-6 text-slate-500 text-sm">{c.descricao || 'Sem descrição'}</td>
                   <td className="px-8 py-6 text-right">
-                    <button onClick={() => handleEdit(c)} className="text-indigo-600 font-bold text-sm hover:underline">Editar</button>
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => handleEdit(c)} className="text-indigo-600 font-bold text-sm hover:underline">Editar</button>
+                      <button onClick={() => handleDeleteCurso(c.id)} className="text-red-600 font-bold text-sm hover:underline">Excluir</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -979,7 +1019,10 @@ const Academic = () => {
                   <td className="px-8 py-6 font-bold text-slate-700">{d.nome}</td>
                   <td className="px-8 py-6 text-slate-500 text-sm">Carga horária: {d.carga_horaria}h</td>
                   <td className="px-8 py-6 text-right">
-                    <button onClick={() => handleEdit(d)} className="text-indigo-600 font-bold text-sm hover:underline">Editar</button>
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => handleEdit(d)} className="text-indigo-600 font-bold text-sm hover:underline">Editar</button>
+                      <button onClick={() => handleDeleteDisciplina(d.id)} className="text-red-600 font-bold text-sm hover:underline">Excluir</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -988,13 +1031,16 @@ const Academic = () => {
                   <td className="px-8 py-6 font-bold text-slate-700">{t.nome}</td>
                   <td className="px-8 py-6 text-slate-500 text-sm">Curso: {t.curso_nome} | Ano: {t.ano_letivo}</td>
                   <td className="px-8 py-6 text-right">
-                    <button onClick={() => handleEdit(t)} className="text-indigo-600 font-bold text-sm hover:underline mr-4">Editar</button>
-                    <button 
-                      onClick={() => { setSelectedTurma(t); setShowStudentsModal(true); }}
-                      className="text-indigo-600 font-bold text-sm hover:underline"
-                    >
-                      Alunos
-                    </button>
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => handleEdit(t)} className="text-indigo-600 font-bold text-sm hover:underline">Editar</button>
+                      <button 
+                        onClick={() => { setSelectedTurma(t); setShowStudentsModal(true); }}
+                        className="text-indigo-600 font-bold text-sm hover:underline"
+                      >
+                        Alunos
+                      </button>
+                      <button onClick={() => handleDeleteTurma(t.id)} className="text-red-600 font-bold text-sm hover:underline">Excluir</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1263,10 +1309,13 @@ const MuralAluno = () => {
   const [data, setData] = useState<any>(null);
   const [comunicados, setComunicados] = useState<any[]>([]);
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
+  const [solicitacoesFin, setSolicitacoesFin] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('mural');
   const [showDocModal, setShowDocModal] = useState(false);
+  const [showFinModal, setShowFinModal] = useState(false);
   const [docType, setDocType] = useState('');
   const [docObs, setDocObs] = useState('');
+  const [finObs, setFinObs] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -1275,14 +1324,16 @@ const MuralAluno = () => {
       return;
     }
     try {
-      const [portalRes, comRes, solRes] = await Promise.all([
+      const [portalRes, comRes, solRes, finSolRes] = await Promise.all([
         api.get(`/portal-aluno/${user.aluno_id}`),
         api.get(`/comunicados-aluno/${user.aluno_id}`),
-        api.get(`/solicitacoes-documentos?aluno_id=${user.aluno_id}`)
+        api.get(`/solicitacoes-documentos?aluno_id=${user.aluno_id}`),
+        api.get(`/solicitacoes-financeiras?aluno_id=${user.aluno_id}`)
       ]);
       setData(portalRes.data);
       setComunicados(comRes.data);
       setSolicitacoes(solRes.data);
+      setSolicitacoesFin(finSolRes.data);
       setError(null);
     } catch (err) {
       console.error(err);
@@ -1317,6 +1368,21 @@ const MuralAluno = () => {
       fetchData();
     } catch (err) {
       alert('Erro ao solicitar documento');
+    }
+  };
+
+  const handleRequestFin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/solicitacoes-financeiras', { 
+        aluno_id: user.aluno_id, 
+        observacao: finObs 
+      });
+      setFinObs('');
+      setShowFinModal(false);
+      fetchData();
+    } catch (err) {
+      alert('Erro ao solicitar atendimento financeiro');
     }
   };
 
@@ -1457,46 +1523,77 @@ const MuralAluno = () => {
 
       {activeTab === 'financeiro' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-8 border-b border-slate-100">
-              <h2 className="text-xl font-bold text-slate-800">Histórico de Pagamentos</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase">
-                  <tr>
-                    <th className="px-8 py-4">Vencimento</th>
-                    <th className="px-8 py-4">Valor</th>
-                    <th className="px-8 py-4">Status</th>
-                    <th className="px-8 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {data.financeiro.map((f: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-8 py-6 text-slate-600">{new Date(f.vencimento).toLocaleDateString('pt-BR')}</td>
-                      <td className="px-8 py-6 font-bold text-slate-800">R$ {(f.valor || 0).toFixed(2)}</td>
-                      <td className="px-8 py-6">
-                        <span className={cn(
-                          "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                          f.status === 'pago' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                        )}>
-                          {f.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        {f.status !== 'pago' && (
-                          <button className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1 justify-end ml-auto">
-                            <Download size={14} /> Baixar Boleto
-                          </button>
-                        )}
-                      </td>
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-slate-800">Histórico de Pagamentos</h2>
+                <button 
+                  onClick={() => setShowFinModal(true)}
+                  className="text-indigo-600 text-sm font-bold hover:underline flex items-center gap-1"
+                >
+                  <MessageSquare size={16} /> Solicitar Atendimento
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase">
+                    <tr>
+                      <th className="px-8 py-4">Vencimento</th>
+                      <th className="px-8 py-4">Valor</th>
+                      <th className="px-8 py-4">Status</th>
+                      <th className="px-8 py-4 text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {data.financeiro.map((f: any, i: number) => (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-6 text-slate-600">{new Date(f.vencimento).toLocaleDateString('pt-BR')}</td>
+                        <td className="px-8 py-6 font-bold text-slate-800">R$ {(f.valor || 0).toFixed(2)}</td>
+                        <td className="px-8 py-6">
+                          <span className={cn(
+                            "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
+                            f.status === 'pago' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                          )}>
+                            {f.status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          {f.status !== 'pago' && (
+                            <button className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1 justify-end ml-auto">
+                              <Download size={14} /> Baixar Boleto
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+              <h2 className="text-xl font-bold text-slate-800 mb-6">Minhas Solicitações Financeiras</h2>
+              <div className="space-y-4">
+                {solicitacoesFin.map((s: any) => (
+                  <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Financeiro</span>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase",
+                        s.status === 'pendente' ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                      )}>
+                        {s.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-700">{s.observacao}</p>
+                    <p className="text-[10px] text-slate-400 mt-2">{new Date(s.created_at).toLocaleString('pt-BR')}</p>
+                  </div>
+                ))}
+                {solicitacoesFin.length === 0 && <p className="text-slate-400 text-center py-4 italic">Nenhuma solicitação pendente.</p>}
+              </div>
             </div>
           </div>
+
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 h-fit">
             <h3 className="font-bold text-slate-800 mb-6">Formas de Pagamento</h3>
             <div className="space-y-4">
@@ -1615,6 +1712,30 @@ const MuralAluno = () => {
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setShowDocModal(false)} className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
                   <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">Solicitar</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+        {showFinModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowFinModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10">
+              <h2 className="text-2xl font-bold text-slate-800 mb-6">Solicitar Atendimento Financeiro</h2>
+              <form onSubmit={handleRequestFin} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Observação / Motivo</label>
+                  <textarea 
+                    value={finObs} 
+                    onChange={(e) => setFinObs(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none h-32"
+                    placeholder="Descreva sua dúvida ou solicitação..."
+                    required
+                  />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setShowFinModal(false)} className="flex-1 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
+                  <button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">Enviar</button>
                 </div>
               </form>
             </motion.div>
@@ -2609,6 +2730,17 @@ const Alunos = () => {
     }
   };
 
+  const handleDeleteAluno = async (id: number) => {
+    if (confirm('Deseja realmente excluir este aluno?')) {
+      try {
+        await api.delete(`/alunos/${id}`);
+        fetchAlunos();
+      } catch (err) {
+        alert('Erro ao excluir aluno');
+      }
+    }
+  };
+
   const filteredAlunos = alunos.filter(a => 
     a.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
     a.cpf.includes(searchTerm)
@@ -2877,6 +3009,16 @@ const Alunos = () => {
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Posição na Sala</label>
+                      <input
+                        type="number"
+                        value={formData.posicao_sala || ''}
+                        onChange={(e) => setFormData({ ...formData, posicao_sala: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Ex: 1, 2, 3..."
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -3087,41 +3229,172 @@ const CARGOS = [
   "Cozinheiro(a)"
 ];
 
+const MapaDeSala = () => {
+  const [turmas, setTurmas] = useState<any[]>([]);
+  const [alunos, setAlunos] = useState<any[]>([]);
+  const [selectedTurmaId, setSelectedTurmaId] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const fetchData = async () => {
+    const [tRes, aRes] = await Promise.all([
+      api.get('/turmas'),
+      api.get('/alunos')
+    ]);
+    setTurmas(tRes.data);
+    setAlunos(aRes.data);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const selectedTurma = turmas.find(t => t.id === parseInt(selectedTurmaId));
+  const alunosDaTurma = alunos.filter(a => a.turma_id === parseInt(selectedTurmaId));
+
+  const handleAssignSeat = async (seatIndex: number, alunoId: number | null) => {
+    if (!alunoId) return;
+    try {
+      const aluno = alunos.find(a => a.id === alunoId);
+      await api.post(`/alunos/${alunoId}`, { ...aluno, posicao_sala: seatIndex });
+      fetchData();
+    } catch (err) {
+      alert('Erro ao atribuir lugar');
+    }
+  };
+
+  const renderSeats = () => {
+    if (!selectedTurma) return null;
+    const seats = [];
+    const capacity = selectedTurma.capacidade || 30;
+    
+    for (let i = 1; i <= capacity; i++) {
+      const studentAtSeat = alunosDaTurma.find(a => a.posicao_sala === i);
+      seats.push(
+        <div key={i} className="relative group">
+          <button
+            className={cn(
+              "w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all",
+              studentAtSeat 
+                ? "bg-indigo-50 border-indigo-200 text-indigo-600" 
+                : "bg-white border-slate-100 text-slate-300 hover:border-slate-200"
+            )}
+          >
+            {studentAtSeat ? (
+              <User size={24} />
+            ) : (
+              <span className="text-xs font-bold">{i}</span>
+            )}
+          </button>
+          
+          {studentAtSeat && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+              <div className="bg-slate-800 text-white p-3 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-3">
+                {studentAtSeat.foto && (
+                  <img src={studentAtSeat.foto} className="w-8 h-8 rounded-lg object-cover" referrerPolicy="no-referrer" />
+                )}
+                <div>
+                  <p className="text-xs font-bold">{studentAtSeat.nome}</p>
+                  <p className="text-[10px] text-slate-400">Posição: {i}</p>
+                </div>
+              </div>
+              <div className="w-2 h-2 bg-slate-800 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    return seats;
+  };
+
+  return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Mapa de Sala</h1>
+        <p className="text-slate-500 mt-1">Visualize e organize a disposição dos alunos em sala.</p>
+      </header>
+
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+        <div className="max-w-xs mb-8">
+          <label className="block text-sm font-bold text-slate-700 mb-2">Selecione a Turma</label>
+          <select
+            value={selectedTurmaId}
+            onChange={(e) => setSelectedTurmaId(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+          >
+            <option value="">Selecione...</option>
+            {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          </select>
+        </div>
+
+        {selectedTurma ? (
+          <div className="space-y-8">
+            <div className="bg-slate-50 p-10 rounded-[40px] border border-slate-100">
+              <div className="max-w-md mx-auto bg-white py-4 rounded-xl border border-slate-200 text-center mb-12 font-bold text-slate-400 uppercase tracking-widest text-xs">
+                Quadro / Professor
+              </div>
+              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6 justify-items-center">
+                {renderSeats()}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-white p-6 rounded-2xl border border-slate-100">
+                <h3 className="font-bold text-slate-800 mb-4">Alunos sem lugar definido</h3>
+                <div className="space-y-2">
+                  {alunosDaTurma.filter(a => !a.posicao_sala).map(a => (
+                    <div key={a.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                      <span className="text-sm font-medium text-slate-700">{a.nome}</span>
+                      <select 
+                        onChange={(e) => handleAssignSeat(parseInt(e.target.value), a.id)}
+                        className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none"
+                      >
+                        <option value="">Atribuir lugar...</option>
+                        {Array.from({ length: selectedTurma.capacidade || 30 }, (_, i) => i + 1)
+                          .filter(pos => !alunosDaTurma.find(al => al.posicao_sala === pos))
+                          .map(pos => <option key={pos} value={pos}>Lugar {pos}</option>)
+                        }
+                      </select>
+                    </div>
+                  ))}
+                  {alunosDaTurma.filter(a => !a.posicao_sala).length === 0 && (
+                    <p className="text-sm text-slate-400 italic">Todos os alunos possuem lugar definido.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-20 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-3xl">
+            Selecione uma turma para visualizar o mapa de sala.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const Funcionarios = () => {
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
+  const [disciplinas, setDisciplinas] = useState<any[]>([]);
+  const [turmas, setTurmas] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [editingItem, setEditingItem] = useState<any>(null);
 
-  const fetchFuncionarios = async () => {
-    const res = await api.get('/funcionarios');
-    setFuncionarios(res.data);
+  const fetchData = async () => {
+    const [fRes, dRes, tRes] = await Promise.all([
+      api.get('/funcionarios'),
+      api.get('/disciplinas'),
+      api.get('/turmas')
+    ]);
+    setFuncionarios(fRes.data);
+    setDisciplinas(dRes.data);
+    setTurmas(tRes.data);
   };
 
   useEffect(() => {
-    fetchFuncionarios();
+    fetchData();
   }, []);
-
-  const handleCepLookup = async (cep: string) => {
-    const cleanCep = cep.replace(/\D/g, '');
-    if (cleanCep.length === 8) {
-      try {
-        const res = await axios.get(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        if (!res.data.erro) {
-          setFormData({
-            ...formData,
-            cep: cleanCep,
-            endereco: res.data.logradouro,
-            bairro: res.data.bairro,
-            cidade: res.data.localidade,
-            estado: res.data.uf
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao buscar CEP');
-      }
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3134,9 +3407,40 @@ const Funcionarios = () => {
       setShowModal(false);
       setEditingItem(null);
       setFormData({});
-      fetchFuncionarios();
+      fetchData();
     } catch (err) {
       alert('Erro ao salvar funcionário');
+    }
+  };
+
+  const handleCepLookup = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
+      try {
+        const res = await axios.get(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        if (!res.data.erro) {
+          setFormData({
+            ...formData,
+            endereco: res.data.logradouro,
+            bairro: res.data.bairro,
+            cidade: res.data.localidade,
+            uf: res.data.uf
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao buscar CEP');
+      }
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Deseja realmente excluir este funcionário?')) {
+      try {
+        await api.delete(`/funcionarios/${id}`);
+        fetchData();
+      } catch (err) {
+        alert('Erro ao excluir funcionário');
+      }
     }
   };
 
@@ -3190,12 +3494,20 @@ const Funcionarios = () => {
                   <p className="text-xs text-slate-400">{f.telefone}</p>
                 </td>
                 <td className="px-8 py-6 text-right">
-                  <button 
-                    onClick={() => { setEditingItem(f); setFormData(f); setShowModal(true); }}
-                    className="text-indigo-600 font-bold text-sm hover:underline"
-                  >
-                    Editar
-                  </button>
+                  <div className="flex justify-end gap-3">
+                    <button 
+                      onClick={() => { setEditingItem(f); setFormData(f); setShowModal(true); }}
+                      className="text-indigo-600 font-bold text-sm hover:underline"
+                    >
+                      Editar
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(f.id)}
+                      className="text-red-600 font-bold text-sm hover:underline"
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -3290,6 +3602,38 @@ const Funcionarios = () => {
                     ))}
                   </select>
                 </div>
+                {formData.cargo === 'Professor(a)' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Disciplina</label>
+                      <select
+                        value={formData.disciplina_id || ''}
+                        onChange={(e) => setFormData({ ...formData, disciplina_id: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                        required
+                      >
+                        <option value="">Selecione a disciplina...</option>
+                        {disciplinas.map(d => (
+                          <option key={d.id} value={d.id}>{d.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Turma/Sala</label>
+                      <select
+                        value={formData.turma_id || ''}
+                        onChange={(e) => setFormData({ ...formData, turma_id: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                        required
+                      >
+                        <option value="">Selecione a turma...</option>
+                        {turmas.map(t => (
+                          <option key={t.id} value={t.id}>{t.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Data de Admissão</label>
                   <input
@@ -3820,11 +4164,9 @@ const ProfessorPortal = () => {
   const [turmas, setTurmas] = useState<any[]>([]);
   const [disciplinas, setDisciplinas] = useState<any[]>([]);
   const [turmaId, setTurmaId] = useState('');
-  const [alunoId, setAlunoId] = useState('');
   const [disciplinaId, setDisciplinaId] = useState('');
-  const [nota, setNota] = useState('');
-  const [conceito, setConceito] = useState('');
-  const [observacao, setObservacao] = useState('');
+  const [bimestre, setBimestre] = useState('1');
+  const [notasColetivas, setNotasColetivas] = useState<any>({});
   const [dataFreq, setDataFreq] = useState(new Date().toISOString().split('T')[0]);
   const [frequenciaData, setFrequenciaData] = useState<any>({});
   const [loading, setLoading] = useState(false);
@@ -3843,36 +4185,43 @@ const ProfessorPortal = () => {
 
   useEffect(() => {
     if (turmaId) {
-      const initialData: any = {};
+      const initialFreq: any = {};
+      const initialNotas: any = {};
       alunos.filter(a => a.turma_id === parseInt(turmaId)).forEach(a => {
-        initialData[a.id] = 'P';
+        initialFreq[a.id] = 'P';
+        initialNotas[a.id] = { valor: '', conceito: '', observacao: '' };
       });
-      setFrequenciaData(initialData);
+      setFrequenciaData(initialFreq);
+      setNotasColetivas(initialNotas);
     } else {
       setFrequenciaData({});
+      setNotasColetivas({});
     }
   }, [turmaId, alunos]);
 
-  const handleLancarNota = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLancarNotasColetivas = async () => {
+    if (!turmaId || !disciplinaId) {
+      alert('Selecione uma turma e uma disciplina');
+      return;
+    }
     setLoading(true);
     try {
-      const aluno = alunos.find(a => a.id === parseInt(alunoId));
-      await api.post('/notas', { 
-        aluno_id: alunoId, 
-        disciplina_id: disciplinaId, 
-        turma_id: aluno?.turma_id || null,
-        bimestre: 1,
-        valor: nota ? parseFloat(nota) : null,
-        conceito: conceito || null,
-        observacao: observacao || null
+      const promises = Object.entries(notasColetivas).map(([id, data]: [string, any]) => {
+        if (!data.valor && !data.conceito && !data.observacao) return Promise.resolve();
+        return api.post('/notas', { 
+          aluno_id: id, 
+          disciplina_id: disciplinaId, 
+          turma_id: turmaId,
+          bimestre: parseInt(bimestre),
+          valor: data.valor ? parseFloat(data.valor) : null,
+          conceito: data.conceito || null,
+          observacao: data.observacao || null
+        });
       });
-      alert('Avaliação lançada com sucesso!');
-      setNota('');
-      setConceito('');
-      setObservacao('');
+      await Promise.all(promises);
+      alert('Notas lançadas com sucesso!');
     } catch (err) {
-      alert('Erro ao lançar avaliação');
+      alert('Erro ao lançar notas');
     } finally {
       setLoading(false);
     }
@@ -3887,7 +4236,7 @@ const ProfessorPortal = () => {
           data: dataFreq, 
           status: status,
           turma_id: turmaId || null,
-          disciplina_id: disciplinaId || null // Assuming we might need this
+          disciplina_id: disciplinaId || null
         })
       );
       await Promise.all(promises);
@@ -3901,204 +4250,200 @@ const ProfessorPortal = () => {
 
   const filteredAlunos = turmaId 
     ? alunos.filter(a => a.turma_id === parseInt(turmaId)) 
-    : alunos;
+    : [];
+
+  const selectedDisciplina = disciplinas.find(d => d.id === parseInt(disciplinaId));
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-3xl font-bold text-slate-800">Portal do Professor</h1>
-          <p className="text-slate-500">Lançamento de notas e diário de classe.</p>
-        </header>
+    <div className="space-y-10">
+      <header>
+        <h1 className="text-3xl font-bold text-slate-800">Diário de Classe</h1>
+        <p className="text-slate-500">Lançamento coletivo de notas e frequência.</p>
+      </header>
 
-        <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-100">
-          <h2 className="text-xl font-bold text-slate-800 mb-8 flex items-center gap-2">
-            <BookOpen className="text-indigo-600" size={24} />
-            Lançar Nota Individual
-          </h2>
-          <form onSubmit={handleLancarNota} className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Aluno</label>
-              <select
-                value={alunoId}
-                onChange={(e) => setAlunoId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                required
-              >
-                <option value="">Selecione um aluno</option>
-                {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Disciplina</label>
-              <select
-                value={disciplinaId}
-                onChange={(e) => {
-                  setDisciplinaId(e.target.value);
-                  setNota('');
-                  setConceito('');
-                  setObservacao('');
-                }}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                required
-              >
-                <option value="">Selecione uma disciplina</option>
-                {disciplinas.map(d => <option key={d.id} value={d.id}>{d.nome} ({d.tipo_avaliacao})</option>)}
-              </select>
-            </div>
-            {disciplinaId && (
-              <>
-                {disciplinas.find(d => d.id === parseInt(disciplinaId))?.tipo_avaliacao === 'nota' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Nota</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      max="10"
-                      min="0"
-                      value={nota}
-                      onChange={(e) => setNota(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      placeholder="0.0 a 10.0"
-                      required
-                    />
-                  </div>
-                )}
-                {disciplinas.find(d => d.id === parseInt(disciplinaId))?.tipo_avaliacao === 'conceito' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Conceito (BNCC)</label>
-                    <select
-                      value={conceito}
-                      onChange={(e) => setConceito(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                      required
-                    >
-                      <option value="">Selecione</option>
-                      <option value="Iniciado">Iniciado (I)</option>
-                      <option value="Em Desenvolvimento">Em Desenvolvimento (ED)</option>
-                      <option value="Desenvolvido">Desenvolvido (D)</option>
-                    </select>
-                  </div>
-                )}
-                {disciplinas.find(d => d.id === parseInt(disciplinaId))?.tipo_avaliacao === 'descritivo' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Relatório Descritivo</label>
-                    <textarea
-                      value={observacao}
-                      onChange={(e) => setObservacao(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none h-32"
-                      placeholder="Descreva o desenvolvimento do aluno..."
-                      required
-                    />
-                  </div>
-                )}
-              </>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Turma</label>
+            <select
+              value={turmaId}
+              onChange={(e) => setTurmaId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
             >
-              {loading ? 'Lançando...' : 'Confirmar Lançamento'}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-100">
-          <h2 className="text-xl font-bold text-slate-800 mb-8 flex items-center gap-2">
-            <ClipboardCheck className="text-indigo-600" size={24} />
-            Diário de Classe (Frequência)
-          </h2>
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Turma</label>
-                <select
-                  value={turmaId}
-                  onChange={(e) => setTurmaId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                >
-                  <option value="">Todas as turmas</option>
-                  {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Data</label>
-                <input
-                  type="date"
-                  value={dataFreq}
-                  onChange={(e) => setDataFreq(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wider">
-                <span className="flex items-center gap-1 text-emerald-600"><div className="w-2 h-2 rounded-full bg-emerald-600" /> Presença (P)</span>
-                <span className="flex items-center gap-1 text-red-600"><div className="w-2 h-2 rounded-full bg-red-600" /> Falta (F)</span>
-                <span className="flex items-center gap-1 text-amber-500"><div className="w-2 h-2 rounded-full bg-amber-500" /> Justificada (FJ)</span>
-              </div>
-              <button 
-                onClick={() => {
-                  const allP: any = {};
-                  filteredAlunos.forEach(a => allP[a.id] = 'P');
-                  setFrequenciaData(allP);
-                }}
-                className="text-[10px] font-bold text-indigo-600 hover:underline"
-              >
-                Marcar Todos como P
-              </button>
-            </div>
-            <div className="border border-slate-100 rounded-2xl overflow-hidden">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredAlunos.map(a => (
-                    <tr key={a.id}>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex justify-center gap-2">
-                          {['P', 'F', 'FJ'].map((status) => (
-                            <button
-                              key={status}
-                              onClick={() => setFrequenciaData({ ...frequenciaData, [a.id]: status })}
-                              className={cn(
-                                "w-8 h-8 rounded-lg text-[10px] font-bold transition-all border",
-                                (frequenciaData[a.id] || 'P') === status
-                                  ? status === 'P' ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-100" :
-                                    status === 'F' ? "bg-red-600 text-white border-red-600 shadow-md shadow-red-100" :
-                                    "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-100"
-                                  : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
-                              )}
-                            >
-                              {status}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <button
-              onClick={handleLancarFrequenciaColetiva}
-              disabled={loading || filteredAlunos.length === 0}
-              className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
+              <option value="">Selecione uma turma</option>
+              {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Disciplina</label>
+            <select
+              value={disciplinaId}
+              onChange={(e) => setDisciplinaId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
             >
-              {loading ? 'Salvando...' : 'Salvar Diário de Classe'}
-            </button>
+              <option value="">Selecione uma disciplina</option>
+              {disciplinas.map(d => <option key={d.id} value={d.id}>{d.nome} ({d.tipo_avaliacao})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Bimestre</label>
+            <select
+              value={bimestre}
+              onChange={(e) => setBimestre(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+            >
+              <option value="1">1º Bimestre</option>
+              <option value="2">2º Bimestre</option>
+              <option value="3">3º Bimestre</option>
+              <option value="4">4º Bimestre</option>
+            </select>
           </div>
         </div>
+
+        {turmaId && disciplinaId ? (
+          <div className="space-y-10">
+            <section>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <BookOpen className="text-indigo-600" size={24} />
+                  Lançamento de Notas Coletivo
+                </h2>
+                <button
+                  onClick={handleLancarNotasColetivas}
+                  disabled={loading || filteredAlunos.length === 0}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Salvando...' : 'Salvar Notas'}
+                </button>
+              </div>
+              <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Avaliação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredAlunos.map(a => (
+                      <tr key={a.id}>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                        <td className="px-6 py-4">
+                          {selectedDisciplina?.tipo_avaliacao === 'nota' && (
+                            <input
+                              type="number"
+                              step="0.1"
+                              max="10"
+                              min="0"
+                              value={notasColetivas[a.id]?.valor || ''}
+                              onChange={(e) => setNotasColetivas({
+                                ...notasColetivas,
+                                [a.id]: { ...notasColetivas[a.id], valor: e.target.value }
+                              })}
+                              className="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                              placeholder="0.0"
+                            />
+                          )}
+                          {selectedDisciplina?.tipo_avaliacao === 'conceito' && (
+                            <select
+                              value={notasColetivas[a.id]?.conceito || ''}
+                              onChange={(e) => setNotasColetivas({
+                                ...notasColetivas,
+                                [a.id]: { ...notasColetivas[a.id], conceito: e.target.value }
+                              })}
+                              className="w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                            >
+                              <option value="">Selecione</option>
+                              <option value="Iniciado">Iniciado (I)</option>
+                              <option value="Em Desenvolvimento">Em Desenvolvimento (ED)</option>
+                              <option value="Desenvolvido">Desenvolvido (D)</option>
+                            </select>
+                          )}
+                          {selectedDisciplina?.tipo_avaliacao === 'descritivo' && (
+                            <textarea
+                              value={notasColetivas[a.id]?.observacao || ''}
+                              onChange={(e) => setNotasColetivas({
+                                ...notasColetivas,
+                                [a.id]: { ...notasColetivas[a.id], observacao: e.target.value }
+                              })}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none h-20"
+                              placeholder="Relatório descritivo..."
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <ClipboardCheck className="text-indigo-600" size={24} />
+                  Diário de Classe (Frequência)
+                </h2>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="date"
+                    value={dataFreq}
+                    onChange={(e) => setDataFreq(e.target.value)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                  <button
+                    onClick={handleLancarFrequenciaColetiva}
+                    disabled={loading || filteredAlunos.length === 0}
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Salvando...' : 'Salvar Frequência'}
+                  </button>
+                </div>
+              </div>
+              <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredAlunos.map(a => (
+                      <tr key={a.id}>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex justify-center gap-2">
+                            {['P', 'F', 'FJ'].map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => setFrequenciaData({ ...frequenciaData, [a.id]: status })}
+                                className={cn(
+                                  "w-8 h-8 rounded-lg text-[10px] font-bold transition-all border",
+                                  (frequenciaData[a.id] || 'P') === status
+                                    ? status === 'P' ? "bg-emerald-600 text-white border-emerald-600" :
+                                      status === 'F' ? "bg-red-600 text-white border-red-600" :
+                                      "bg-amber-500 text-white border-amber-500"
+                                    : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
+                                )}
+                              >
+                                {status}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="p-20 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-3xl">
+            Selecione uma turma e uma disciplina para carregar o diário.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -4162,6 +4507,36 @@ const Financeiro = () => {
       } catch (err) {
         console.error(err);
       }
+    }
+  };
+
+  const handleSendReminder = async (aluno: any, type: 'whatsapp' | 'email') => {
+    try {
+      const configRes = await api.get('/configuracoes');
+      const config = configRes.data;
+      const template = type === 'whatsapp' ? config.msg_cobranca_whatsapp : config.msg_cobranca_email;
+      
+      const message = template
+        ?.replace('{aluno}', aluno.nome)
+        ?.replace('{responsavel}', aluno.responsavel_legal || aluno.nome_mae || 'Responsável')
+        ?.replace('{valor}', aluno.valor_pendente || '0,00');
+
+      if (type === 'whatsapp') {
+        const phone = aluno.telefone?.replace(/\D/g, '');
+        if (phone) {
+          window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message || 'Lembrete de pagamento')}`, '_blank');
+        } else {
+          alert('Telefone não cadastrado');
+        }
+      } else {
+        if (aluno.email) {
+          window.open(`mailto:${aluno.email}?subject=Lembrete de Pagamento&body=${encodeURIComponent(message || 'Lembrete de pagamento')}`, '_blank');
+        } else {
+          alert('E-mail não cadastrado');
+        }
+      }
+    } catch (err) {
+      alert('Erro ao enviar lembrete');
     }
   };
 
@@ -4266,13 +4641,29 @@ const Financeiro = () => {
                     <td className="px-8 py-6 text-right">
                       <div className="flex justify-end gap-2">
                         {p.status !== 'pago' && p.status !== 'estornado' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(p.id, 'pago')}
-                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                            title="Dar Baixa (Pago)"
-                          >
-                            <Check size={18} />
-                          </button>
+                          <>
+                            <button 
+                              onClick={() => handleSendReminder({ nome: p.aluno_nome, telefone: p.aluno_telefone, email: p.aluno_email, valor_pendente: p.valor.toFixed(2) }, 'whatsapp')}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Enviar lembrete WhatsApp"
+                            >
+                              <MessageCircle size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleSendReminder({ nome: p.aluno_nome, telefone: p.aluno_telefone, email: p.aluno_email, valor_pendente: p.valor.toFixed(2) }, 'email')}
+                              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                              title="Enviar lembrete E-mail"
+                            >
+                              <Mail size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleUpdateStatus(p.id, 'pago')}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Dar Baixa (Pago)"
+                            >
+                              <Check size={18} />
+                            </button>
+                          </>
                         )}
                         {p.status === 'pago' && (
                           <button 
@@ -4288,7 +4679,7 @@ const Financeiro = () => {
                           className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                           title="Excluir Cobrança"
                         >
-                          <X size={18} />
+                          <Trash2 size={18} />
                         </button>
                       </div>
                     </td>
@@ -4453,6 +4844,7 @@ export default function App() {
         <Route path="/funcionarios" element={<ProtectedRoute><Funcionarios /></ProtectedRoute>} />
         <Route path="/academic" element={<ProtectedRoute><Academic /></ProtectedRoute>} />
         <Route path="/professor" element={<ProtectedRoute><ProfessorPortal /></ProtectedRoute>} />
+        <Route path="/mapa-sala" element={<ProtectedRoute><MapaDeSala /></ProtectedRoute>} />
         <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
         <Route path="/comunicacao" element={<ProtectedRoute><Communication /></ProtectedRoute>} />
         <Route path="/secretaria" element={<ProtectedRoute><DigitalSecretary /></ProtectedRoute>} />
