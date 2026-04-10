@@ -4448,6 +4448,8 @@ export default function App() {
     if (!localStorage.getItem('token')) {
       localStorage.setItem('token', 'dev-token');
     }
+    // Initialize database
+    api.post('/init-db').catch(console.error);
   }, []);
 
   return (
