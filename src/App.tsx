@@ -42,7 +42,8 @@ import {
   Map,
   MessageCircle,
   Mail,
-  HelpCircle
+  HelpCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -776,23 +777,25 @@ const Dashboard = () => {
             </select>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorMat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                />
-                <Area type="monotone" dataKey="matriculas" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorMat)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 && (
+              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorMat" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                  <Tooltip 
+                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                  />
+                  <Area type="monotone" dataKey="matriculas" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorMat)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -804,17 +807,19 @@ const Dashboard = () => {
             </h2>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                />
-                <Bar dataKey="financeiro" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 && (
+              <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                  <Tooltip 
+                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                  />
+                  <Bar dataKey="financeiro" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -2504,6 +2509,21 @@ const Settings = () => {
     }
   };
 
+  const handleResetDB = async () => {
+    if (confirm('TEM CERTEZA? Esta ação é irreversível e apagará TODOS os dados do sistema.')) {
+      const confirmText = prompt('Para confirmar, digite "RESETAR" abaixo:');
+      if (confirmText === 'RESETAR') {
+        try {
+          await api.post('/system/reset-db');
+          alert('Banco de dados resetado com sucesso. O sistema será reiniciado.');
+          window.location.reload();
+        } catch (err) {
+          alert('Erro ao resetar banco de dados');
+        }
+      }
+    }
+  };
+
   if (loading) return <div className="p-20 text-center text-slate-500">Carregando configurações...</div>;
 
   return (
@@ -2635,6 +2655,23 @@ const Settings = () => {
               <span className="text-slate-700 font-medium">Permitir que alunos vejam notas antes do fechamento</span>
             </label>
           </div>
+        </div>
+
+        <div className="bg-red-50 p-8 rounded-3xl border border-red-100">
+          <h2 className="text-xl font-bold text-red-800 mb-4 flex items-center gap-2">
+            <AlertTriangle size={20} />
+            Zona de Perigo
+          </h2>
+          <p className="text-red-600 text-sm mb-6">
+            Atenção: Ao resetar o banco de dados, todos os dados (alunos, turmas, notas, etc.) serão permanentemente excluídos. 
+            O sistema voltará ao estado inicial de produção.
+          </p>
+          <button 
+            onClick={handleResetDB}
+            className="bg-red-600 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition-all"
+          >
+            Resetar Banco de Dados
+          </button>
         </div>
       </div>
     </div>

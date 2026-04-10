@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS alunos (
   uso_medicamentos INTEGER DEFAULT 0,
   medicamentos_quais TEXT,
   status TEXT DEFAULT 'ativo',
+  posicao_sala INTEGER,
   fileira INTEGER,
   assento INTEGER
 );
@@ -646,6 +647,26 @@ app.get('/api/health', async (c) => {
       const db = new DBWrapper(c.env.DB);
       await db.prepare("DELETE FROM turmas WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
       return c.json({ success: true });
+    });
+
+    app.post('/api/system/reset-db', auth, async (c) => {
+      if (c.get('user').perfil !== 'admin') {
+        return c.json({ error: 'Acesso negado' }, 403);
+      }
+      const db = new DBWrapper(c.env.DB);
+      const tables = [
+        'usuarios', 'empresas', 'cursos', 'disciplinas', 'turmas', 
+        'alunos', 'matriculas', 'notas', 'frequencias', 
+        'historico_remanejamentos', 'financeiro', 'comunicados', 
+        'comunicados_lidos', 'solicitacoes_documentos', 'solicitacoes_financeiras',
+        'funcionarios', 'permissoes'
+      ];
+      
+      for (const table of tables) {
+        await db.exec(`DROP TABLE IF EXISTS ${table}`);
+      }
+      
+      return c.json({ success: true, message: 'Banco de dados resetado. Recarregue a página para reinicializar o esquema.' });
     });
 
     app.post('/api/cursos', auth, async (c) => {
