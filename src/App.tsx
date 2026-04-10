@@ -191,16 +191,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           {hasAccess('Secretaria') && <SidebarItem to="/secretaria" icon={FileText} label="Secretaria" active={location.pathname === '/secretaria'} />}
           {hasAccess('Acesso') && <SidebarItem to="/controle-acesso" icon={ShieldCheck} label="Acesso" active={location.pathname === '/controle-acesso'} />}
           {hasAccess('Configurações') && <SidebarItem to="/configuracoes" icon={SettingsIcon} label="Configurações" active={location.pathname === '/configuracoes'} />}
-          
-          {isAdmin && (
-            <button
-              onClick={() => window.open('/api/download-db', '_blank')}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-all duration-200 group w-full text-left"
-            >
-              <Download size={20} className="text-slate-400 group-hover:text-indigo-600 transition-transform group-hover:scale-110" />
-              <span className="font-medium">Backup de Dados</span>
-            </button>
-          )}
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-100">
@@ -617,32 +607,6 @@ const Dashboard = () => {
           </button>
         </div>
       </header>
-
-      {isAdmin && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-50 border border-amber-200 p-6 rounded-[32px] flex flex-col md:flex-row items-center gap-6 shadow-sm"
-        >
-          <div className="bg-amber-100 p-4 rounded-2xl text-amber-600">
-            <Download size={28} />
-          </div>
-          <div className="flex-1 text-center md:text-left">
-            <h4 className="font-bold text-amber-900 text-lg">Atenção: Backup Necessário</h4>
-            <p className="text-sm text-amber-700 mt-1 leading-relaxed">
-              O banco de dados é local e temporário neste ambiente de desenvolvimento. 
-              Para não perder seus dados, clique no botão ao lado ou em <strong>"Backup de Dados"</strong> no menu lateral para baixar uma cópia do arquivo <code>database.db</code>.
-            </p>
-          </div>
-          <button 
-            onClick={() => window.open('/api/download-db', '_blank')}
-            className="w-full md:w-auto bg-amber-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-200 flex items-center justify-center gap-2"
-          >
-            <Download size={18} />
-            Baixar Backup
-          </button>
-        </motion.div>
-      )}
 
       <AnimatePresence>
         {showMatriculaModal && (
@@ -4109,27 +4073,23 @@ const ControleAcesso = () => {
     const current = permissoes.find(p => p.tela === telaId) || {
       pode_acessar: 0,
       pode_editar: 0,
-      pode_excluir: 0,
-      pode_backup: 0
+      pode_excluir: 0
     };
 
     let newAcesso = current.pode_acessar;
     let newEditar = current.pode_editar;
     let newExcluir = current.pode_excluir;
-    let newBackup = current.pode_backup;
 
     if (field === 'pode_acessar') {
       newAcesso = current.pode_acessar ? 0 : 1;
       if (newAcesso === 0) {
         newEditar = 0;
         newExcluir = 0;
-        newBackup = 0;
       }
     } else {
       const newVal = current[field] ? 0 : 1;
       if (field === 'pode_editar') newEditar = newVal;
       if (field === 'pode_excluir') newExcluir = newVal;
-      if (field === 'pode_backup') newBackup = newVal;
       
       // Se qualquer um for ativado, o acesso deve ser ativado
       if (newVal === 1) newAcesso = 1;
@@ -4140,8 +4100,7 @@ const ControleAcesso = () => {
       tela: telaId,
       pode_acessar: newAcesso,
       pode_editar: newEditar,
-      pode_excluir: newExcluir,
-      pode_backup: newBackup
+      pode_excluir: newExcluir
     };
     
     try {
@@ -4162,8 +4121,7 @@ const ControleAcesso = () => {
           tela: tela.id,
           pode_acessar: 1,
           pode_editar: 1,
-          pode_excluir: 1,
-          pode_backup: 1
+          pode_excluir: 1
         });
       }
       const res = await api.get(`/permissoes/${selectedUser.id}`);
@@ -4182,8 +4140,7 @@ const ControleAcesso = () => {
           tela: tela.id,
           pode_acessar: 0,
           pode_editar: 0,
-          pode_excluir: 0,
-          pode_backup: 0
+          pode_excluir: 0
         });
       }
       const res = await api.get(`/permissoes/${selectedUser.id}`);
@@ -4384,7 +4341,6 @@ const ControleAcesso = () => {
                             <th className="px-4 py-4 border-b border-slate-100 text-center">Acesso</th>
                             <th className="px-4 py-4 border-b border-slate-100 text-center">Editar</th>
                             <th className="px-4 py-4 border-b border-slate-100 text-center">Excluir</th>
-                            <th className="px-4 py-4 border-b border-slate-100 text-center">Backup</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -4392,8 +4348,7 @@ const ControleAcesso = () => {
                             const p = permissoes.find(perm => perm.tela === tela.id) || {
                               pode_acessar: 0,
                               pode_editar: 0,
-                              pode_excluir: 0,
-                              pode_backup: 0
+                              pode_excluir: 0
                             };
 
                             return (
@@ -4419,13 +4374,6 @@ const ControleAcesso = () => {
                                     active={p.pode_excluir === 1} 
                                     disabled={p.pode_acessar === 0}
                                     onClick={() => togglePermissao(tela.id, 'pode_excluir')} 
-                                  />
-                                </td>
-                                <td className="px-4 py-5 text-center">
-                                  <PermissionToggle 
-                                    active={p.pode_backup === 1} 
-                                    disabled={p.pode_acessar === 0}
-                                    onClick={() => togglePermissao(tela.id, 'pode_backup')} 
                                   />
                                 </td>
                               </tr>

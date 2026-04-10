@@ -203,8 +203,7 @@ CREATE TABLE IF NOT EXISTS permissoes (
   tela TEXT,
   pode_acessar INTEGER DEFAULT 1,
   pode_editar INTEGER DEFAULT 0,
-  pode_excluir INTEGER DEFAULT 0,
-  pode_backup INTEGER DEFAULT 0
+  pode_excluir INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS professores (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -648,20 +647,19 @@ app.get('/api/health', async (c) => {
     app.post('/api/permissoes', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const { usuario_id, tela, pode_acessar, pode_editar, pode_excluir, pode_backup } = await c.req.json();
+      const { usuario_id, tela, pode_acessar, pode_editar, pode_excluir } = await c.req.json();
       const existing = await db.prepare("SELECT id FROM permissoes WHERE usuario_id = ? AND tela = ? AND empresa_id = ?").get(usuario_id, tela, c.get('user').empresa_id) as any;
       
       if (existing) {
-        await db.prepare("UPDATE permissoes SET pode_acessar = ?, pode_editar = ?, pode_excluir = ?, pode_backup = ? WHERE id = ?").run(
+        await db.prepare("UPDATE permissoes SET pode_acessar = ?, pode_editar = ?, pode_excluir = ? WHERE id = ?").run(
           pode_acessar ? 1 : 0, 
           pode_editar ? 1 : 0, 
           pode_excluir ? 1 : 0, 
-          pode_backup ? 1 : 0, 
           existing.id
         );
       } else {
-        await db.prepare("INSERT INTO permissoes (usuario_id, tela, pode_acessar, pode_editar, pode_excluir, pode_backup, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
-          .run(usuario_id, tela, pode_acessar ? 1 : 0, pode_editar ? 1 : 0, pode_excluir ? 1 : 0, pode_backup ? 1 : 0, c.get('user').empresa_id);
+        await db.prepare("INSERT INTO permissoes (usuario_id, tela, pode_acessar, pode_editar, pode_excluir, empresa_id) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(usuario_id, tela, pode_acessar ? 1 : 0, pode_editar ? 1 : 0, pode_excluir ? 1 : 0, c.get('user').empresa_id);
       }
       return c.json({ success: true });
     });
