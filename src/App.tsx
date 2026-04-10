@@ -91,10 +91,10 @@ const SidebarItem = ({ to, icon: Icon, label, active }: { to: string; icon: any;
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = JSON.parse(localStorage.getItem('user') || '{"id": 1, "nome": "Administrador", "perfil": "admin", "empresa_id": 1}');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userPerms, setUserPerms] = useState<any[]>([]);
-  const [loadingPerms, setLoadingPerms] = useState(false); // Desativado carregamento para facilitar
+  const [loadingPerms, setLoadingPerms] = useState(true);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -4432,22 +4432,13 @@ const Boletim = () => {
 // --- App Root ---
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('token');
+  if (!token) return <Navigate to="/login" />;
   return <Layout>{children}</Layout>;
 };
 
 export default function App() {
   useEffect(() => {
-    if (!localStorage.getItem('user')) {
-      localStorage.setItem('user', JSON.stringify({
-        id: 1,
-        nome: "Administrador",
-        perfil: "admin",
-        empresa_id: 1
-      }));
-    }
-    if (!localStorage.getItem('token')) {
-      localStorage.setItem('token', 'dev-token');
-    }
     // Initialize database
     api.post('/init-db').catch(console.error);
   }, []);
