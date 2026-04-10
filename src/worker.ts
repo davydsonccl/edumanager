@@ -317,7 +317,8 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       "ALTER TABLE alunos ADD COLUMN whatsapp_responsavel TEXT",
       "ALTER TABLE alunos ADD COLUMN email_responsavel TEXT",
       "ALTER TABLE funcionarios ADD COLUMN disciplina_id INTEGER",
-      "ALTER TABLE funcionarios ADD COLUMN turma_id INTEGER"
+      "ALTER TABLE funcionarios ADD COLUMN turma_id INTEGER",
+      "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER"
     ];
 
     for (const m of migrations) {
@@ -390,6 +391,7 @@ app.get('/api/health', async (c) => {
         empresa_id: user.empresa_id, 
         aluno_id: user.aluno_id,
         professor_id: user.professor_id,
+        funcionario_id: user.funcionario_id,
         nome: user.nome, 
         perfil: user.perfil 
       }, JWT_SECRET);
@@ -403,6 +405,7 @@ app.get('/api/health', async (c) => {
           perfil: user.perfil, 
           aluno_id: user.aluno_id, 
           professor_id: user.professor_id,
+          funcionario_id: user.funcionario_id,
           primeiro_acesso: user.primeiro_acesso === 1
         } 
       });
@@ -435,6 +438,7 @@ app.get('/api/health', async (c) => {
       const { nome, email, senha, perfil } = data;
       const aluno_id = toInt(data.aluno_id);
       const professor_id = toInt(data.professor_id);
+      const funcionario_id = toInt(data.funcionario_id);
       const curso_id = toInt(data.curso_id);
       const turma_id = toInt(data.turma_id);
       const ano_letivo = toInt(data.ano_letivo);
@@ -442,9 +446,9 @@ app.get('/api/health', async (c) => {
       const hash = bcrypt.hashSync(senha, 10);
       try {
         const result = await db.prepare(`
-          INSERT INTO usuarios (empresa_id, nome, email, senha, perfil, aluno_id, professor_id, curso_id, turma_id, ano_letivo, primeiro_acesso)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        `).run(c.get('user').empresa_id, nome, email, hash, perfil, aluno_id, professor_id, curso_id, turma_id, ano_letivo);
+          INSERT INTO usuarios (empresa_id, nome, email, senha, perfil, aluno_id, professor_id, funcionario_id, curso_id, turma_id, ano_letivo, primeiro_acesso)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `).run(c.get('user').empresa_id, nome, email, hash, perfil, aluno_id, professor_id, funcionario_id, curso_id, turma_id, ano_letivo);
         return c.json({ id: result.lastInsertRowid });
       } catch (err: any) {
         return c.json({ error: 'E-mail já cadastrado ou erro no banco: ' + err.message }, 400);
@@ -665,7 +669,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/usuarios', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await db.prepare("SELECT id, nome, email, perfil, aluno_id, professor_id FROM usuarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
+      const rows = await db.prepare("SELECT id, nome, email, perfil, aluno_id, professor_id, funcionario_id FROM usuarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
       return c.json(rows);
     });
 
@@ -1046,8 +1050,7 @@ app.get('/api/health', async (c) => {
     });
 
     app.get('/api/comunicados-aluno/:alunoId', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
-
+      const db = new DBWrapper(c.env.DB);
       const rows = await db.prepare(`
         SELECT c.*, (SELECT COUNT(*) FROM comunicados_lidos cl WHERE cl.comunicado_id = c.id AND cl.aluno_id = ?) as lido
         FROM comunicados c 
@@ -1056,6 +1059,43 @@ app.get('/api/health', async (c) => {
         ORDER BY c.data_postagem DESC
       `).all(c.req.param('alunoId'), c.get('user').empresa_id);
       return c.json(rows);
+    });
+
+    app.get('/api/portal-aluno/:alunoId', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const alunoId = c.req.param('alunoId');
+      const empresaId = c.get('user').empresa_id;
+
+      const [notas, frequencia, financeiro] = await Promise.all([
+        db.prepare(`
+          SELECT d.nome as disciplina, AVG(n.valor) as media
+          FROM notas n
+          JOIN disciplinas d ON n.disciplina_id = d.id
+          WHERE n.aluno_id = ? AND n.empresa_id = ?
+          GROUP BY d.id
+        `).all(alunoId, empresaId),
+        db.prepare(`
+          SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'presente' THEN 1 ELSE 0 END) as presencas
+          FROM frequencias
+          WHERE aluno_id = ? AND empresa_id = ?
+        `).get(alunoId, empresaId),
+        db.prepare(`
+          SELECT descricao, valor, status, vencimento
+          FROM financeiro
+          WHERE aluno_id = ? AND empresa_id = ?
+          ORDER BY vencimento DESC
+        `).all(alunoId, empresaId)
+      ]);
+
+      const percentualFrequencia = frequencia.total > 0 ? (frequencia.presencas / frequencia.total) * 100 : 100;
+
+      return c.json({
+        notas,
+        frequencia: { percentual: percentualFrequencia },
+        financeiro
+      });
     });
 
     app.post('/api/comunicados/marcar-lido', auth, async (c) => {

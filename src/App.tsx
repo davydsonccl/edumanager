@@ -1324,13 +1324,16 @@ const MuralAluno = () => {
   const [finObs, setFinObs] = useState('');
   const [selectedFinId, setSelectedFinId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     if (!user.aluno_id) {
       setError('Acesso negado: Este usuário não possui um ID de aluno vinculado.');
+      setLoading(false);
       return;
     }
     try {
+      setLoading(true);
       const [portalRes, comRes, solRes, finSolRes] = await Promise.all([
         api.get(`/portal-aluno/${user.aluno_id}`),
         api.get(`/comunicados-aluno/${user.aluno_id}`),
@@ -1345,6 +1348,8 @@ const MuralAluno = () => {
     } catch (err) {
       console.error(err);
       setError('Erro ao carregar os dados do mural. Verifique sua conexão.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1394,6 +1399,8 @@ const MuralAluno = () => {
       alert('Erro ao solicitar atendimento financeiro');
     }
   };
+
+  if (loading) return <div className="p-10 text-center text-slate-500">Carregando informações do mural...</div>;
 
   if (error) return (
     <div className="p-10 flex flex-col items-center justify-center space-y-4">
@@ -3966,7 +3973,7 @@ const ControleAcesso = () => {
     });
     
     funcionarios.forEach(f => {
-      const user = usuarios.find(u => u.professor_id === f.id);
+      const user = usuarios.find(u => u.funcionario_id === f.id);
       list.push({
         id: f.id,
         nome: f.nome,
@@ -4050,7 +4057,8 @@ const ControleAcesso = () => {
           senha: tempPassword,
           perfil: selectedRecord.tipo === 'aluno' ? 'aluno' : (selectedRecord.cargo === 'Professor' ? 'professor' : 'funcionario'),
           aluno_id: selectedRecord.tipo === 'aluno' ? selectedRecord.id : null,
-          professor_id: selectedRecord.tipo === 'funcionario' && selectedRecord.cargo === 'Professor' ? selectedRecord.id : null
+          professor_id: selectedRecord.tipo === 'funcionario' && selectedRecord.cargo === 'Professor' ? selectedRecord.id : null,
+          funcionario_id: selectedRecord.tipo === 'funcionario' ? selectedRecord.id : null
         });
         userId = res.data.id;
       }
