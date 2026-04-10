@@ -41,7 +41,8 @@ import {
   Key,
   Map,
   MessageCircle,
-  Mail
+  Mail,
+  HelpCircle
 } from 'lucide-react';
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -1316,6 +1317,7 @@ const MuralAluno = () => {
   const [docType, setDocType] = useState('');
   const [docObs, setDocObs] = useState('');
   const [finObs, setFinObs] = useState('');
+  const [selectedFinId, setSelectedFinId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -1376,9 +1378,11 @@ const MuralAluno = () => {
     try {
       await api.post('/solicitacoes-financeiras', { 
         aluno_id: user.aluno_id, 
+        financeiro_id: selectedFinId,
         observacao: finObs 
       });
       setFinObs('');
+      setSelectedFinId(null);
       setShowFinModal(false);
       fetchData();
     } catch (err) {
@@ -1552,16 +1556,29 @@ const MuralAluno = () => {
                         <td className="px-8 py-6">
                           <span className={cn(
                             "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                            f.status === 'pago' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                            f.status === 'pago' ? "bg-emerald-100 text-emerald-700" : 
+                            f.status === 'atrasado' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
                           )}>
                             {f.status}
                           </span>
                         </td>
                         <td className="px-8 py-6 text-right">
                           {f.status !== 'pago' && (
-                            <button className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1 justify-end ml-auto">
-                              <Download size={14} /> Baixar Boleto
-                            </button>
+                            <div className="flex justify-end gap-2">
+                              <button 
+                                onClick={() => {
+                                  setFinObs(`Solicitação referente ao pagamento de R$ ${f.valor.toFixed(2)} com vencimento em ${new Date(f.vencimento).toLocaleDateString('pt-BR')}.`);
+                                  setSelectedFinId(f.id);
+                                  setShowFinModal(true);
+                                }}
+                                className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1"
+                              >
+                                <HelpCircle size={14} /> Questionar
+                              </button>
+                              <button className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1">
+                                <Download size={14} /> Boleto
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -2647,13 +2664,16 @@ const Alunos = () => {
     nome_pai: '',
     nome_mae: '',
     responsavel_legal: '',
+    whatsapp_responsavel: '',
     telefone: '',
     email: '',
     problemas_saude: [],
     problemas_saude_outros: '',
     uso_medicamentos: false,
     medicamentos_quais: '',
-    turma_id: ''
+    turma_id: '',
+    fileira: '',
+    assento: ''
   });
 
   const healthProblemsList = [
@@ -2700,10 +2720,14 @@ const Alunos = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const finalFormData = {
+        ...formData,
+        whatsapp_responsavel: `${formData.whatsapp_pais_codigo || '+55'} (${formData.whatsapp_ddd || ''}) ${formData.whatsapp_numero || ''}`
+      };
       if (editingItem) {
-        await api.post(`/alunos/${editingItem.id}`, formData);
+        await api.post(`/alunos/${editingItem.id}`, finalFormData);
       } else {
-        await api.post('/alunos', formData);
+        await api.post('/alunos', finalFormData);
       }
       setShowModal(false);
       setEditingItem(null);
@@ -2713,7 +2737,8 @@ const Alunos = () => {
         foto: '', nome_pai: '', nome_mae: '', responsavel_legal: '',
         telefone: '', email: '', problemas_saude: [], 
         problemas_saude_outros: '', uso_medicamentos: false, medicamentos_quais: '',
-        turma_id: ''
+        turma_id: '', fileira: '', assento: '',
+        whatsapp_pais_codigo: '+55', whatsapp_ddd: '', whatsapp_numero: ''
       });
       fetchAlunos();
     } catch (err) {
@@ -2821,28 +2846,48 @@ const Alunos = () => {
                     </div>
                   </td>
                   <td className="px-8 py-6 text-right">
-                    <div className="flex justify-end gap-3">
-                      <Link to={`/secretaria?alunoId=${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Gerar Documentos">
-                        <FileText size={18} />
-                      </Link>
-                      <Link to={`/boletim/${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Ver Boletim">
-                        <BookOpen size={18} />
-                      </Link>
-                      <button 
-                        onClick={() => { 
-                          setEditingItem(aluno); 
-                          setFormData({
-                            ...aluno,
-                            problemas_saude: typeof aluno.problemas_saude === 'string' ? JSON.parse(aluno.problemas_saude) : (aluno.problemas_saude || [])
-                          });
-                          setShowModal(true); 
-                        }}
-                        className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all"
-                        title="Editar Aluno"
-                      >
-                        <SettingsIcon size={18} />
-                      </button>
-                    </div>
+                      <div className="flex justify-end gap-3">
+                        <Link to={`/secretaria?alunoId=${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Gerar Documentos">
+                          <FileText size={18} />
+                        </Link>
+                        <Link to={`/boletim/${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Ver Boletim">
+                          <BookOpen size={18} />
+                        </Link>
+                        <button 
+                          onClick={() => { 
+                            const whatsapp = aluno.whatsapp_responsavel || '';
+                            const match = whatsapp.match(/^(\+\d+)\s\((\d+)\)\s(.*)$/);
+                            const whatsappParts = match ? {
+                              whatsapp_pais_codigo: match[1],
+                              whatsapp_ddd: match[2],
+                              whatsapp_numero: match[3]
+                            } : {
+                              whatsapp_pais_codigo: '+55',
+                              whatsapp_ddd: '',
+                              whatsapp_numero: whatsapp
+                            };
+
+                            setEditingItem(aluno); 
+                            setFormData({
+                              ...aluno,
+                              ...whatsappParts,
+                              problemas_saude: typeof aluno.problemas_saude === 'string' ? JSON.parse(aluno.problemas_saude) : (aluno.problemas_saude || [])
+                            });
+                            setShowModal(true); 
+                          }}
+                          className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all"
+                          title="Editar Aluno"
+                        >
+                          <SettingsIcon size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteAluno(aluno.id)}
+                          className="p-2 rounded-xl text-red-600 hover:bg-red-50 transition-all"
+                          title="Excluir Aluno"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                   </td>
                 </tr>
               ))}
@@ -3010,13 +3055,23 @@ const Alunos = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Posição na Sala</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Fileira</label>
                       <input
                         type="number"
-                        value={formData.posicao_sala || ''}
-                        onChange={(e) => setFormData({ ...formData, posicao_sala: e.target.value })}
+                        value={formData.fileira || ''}
+                        onChange={(e) => setFormData({ ...formData, fileira: e.target.value })}
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                        placeholder="Ex: 1, 2, 3..."
+                        placeholder="1, 2, 3..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Assento</label>
+                      <input
+                        type="number"
+                        value={formData.assento || ''}
+                        onChange={(e) => setFormData({ ...formData, assento: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="1, 2, 3..."
                       />
                     </div>
                   </div>
@@ -3115,6 +3170,33 @@ const Alunos = () => {
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="Caso não seja o pai ou a mãe"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">WhatsApp Responsável</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={formData.whatsapp_pais_codigo || '+55'}
+                          onChange={(e) => setFormData({ ...formData, whatsapp_pais_codigo: e.target.value })}
+                          className="w-20 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          placeholder="+55"
+                        />
+                        <input
+                          type="text"
+                          value={formData.whatsapp_ddd || ''}
+                          onChange={(e) => setFormData({ ...formData, whatsapp_ddd: e.target.value })}
+                          className="w-20 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          placeholder="DDD"
+                          maxLength={2}
+                        />
+                        <input
+                          type="text"
+                          value={formData.whatsapp_numero || ''}
+                          onChange={(e) => setFormData({ ...formData, whatsapp_numero: e.target.value })}
+                          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          placeholder="99999-9999"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3251,11 +3333,11 @@ const MapaDeSala = () => {
   const selectedTurma = turmas.find(t => t.id === parseInt(selectedTurmaId));
   const alunosDaTurma = alunos.filter(a => a.turma_id === parseInt(selectedTurmaId));
 
-  const handleAssignSeat = async (seatIndex: number, alunoId: number | null) => {
+  const handleAssignSeat = async (fileira: number, assento: number, alunoId: number | null) => {
     if (!alunoId) return;
     try {
       const aluno = alunos.find(a => a.id === alunoId);
-      await api.post(`/alunos/${alunoId}`, { ...aluno, posicao_sala: seatIndex });
+      await api.post(`/alunos/${alunoId}`, { ...aluno, fileira, assento });
       fetchData();
     } catch (err) {
       alert('Erro ao atribuir lugar');
@@ -3264,53 +3346,65 @@ const MapaDeSala = () => {
 
   const renderSeats = () => {
     if (!selectedTurma) return null;
-    const seats = [];
-    const capacity = selectedTurma.capacidade || 30;
+    const rows = 6; // Default 6 rows
+    const cols = 6; // Default 6 seats per row
     
-    for (let i = 1; i <= capacity; i++) {
-      const studentAtSeat = alunosDaTurma.find(a => a.posicao_sala === i);
-      seats.push(
-        <div key={i} className="relative group">
-          <button
-            className={cn(
-              "w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all",
-              studentAtSeat 
-                ? "bg-indigo-50 border-indigo-200 text-indigo-600" 
-                : "bg-white border-slate-100 text-slate-300 hover:border-slate-200"
-            )}
-          >
-            {studentAtSeat ? (
-              <User size={24} />
-            ) : (
-              <span className="text-xs font-bold">{i}</span>
-            )}
-          </button>
-          
-          {studentAtSeat && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-              <div className="bg-slate-800 text-white p-3 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-3">
-                {studentAtSeat.foto && (
-                  <img src={studentAtSeat.foto} className="w-8 h-8 rounded-lg object-cover" referrerPolicy="no-referrer" />
-                )}
-                <div>
-                  <p className="text-xs font-bold">{studentAtSeat.nome}</p>
-                  <p className="text-[10px] text-slate-400">Posição: {i}</p>
+    const grid = [];
+    for (let f = 1; f <= rows; f++) {
+      const rowSeats = [];
+      for (let a = 1; a <= cols; a++) {
+        const studentAtSeat = alunosDaTurma.find(al => al.fileira === f && al.assento === a);
+        rowSeats.push(
+          <div key={`${f}-${a}`} className="relative group">
+            <button
+              className={cn(
+                "w-16 h-16 rounded-xl border-2 flex flex-col items-center justify-center transition-all",
+                studentAtSeat 
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-600" 
+                  : "bg-white border-slate-100 text-slate-300 hover:border-slate-200"
+              )}
+            >
+              {studentAtSeat ? (
+                <>
+                  <User size={20} />
+                  <span className="text-[8px] font-bold truncate w-full px-1">{studentAtSeat.nome.split(' ')[0]}</span>
+                </>
+              ) : (
+                <span className="text-[10px] font-bold text-slate-200">{f}-{a}</span>
+              )}
+            </button>
+            
+            {studentAtSeat && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                <div className="bg-slate-800 text-white p-3 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-3">
+                  {studentAtSeat.foto && (
+                    <img src={studentAtSeat.foto} className="w-8 h-8 rounded-lg object-cover" referrerPolicy="no-referrer" />
+                  )}
+                  <div>
+                    <p className="text-xs font-bold">{studentAtSeat.nome}</p>
+                    <p className="text-[10px] text-slate-400">Fileira: {f}, Assento: {a}</p>
+                  </div>
                 </div>
+                <div className="w-2 h-2 bg-slate-800 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
               </div>
-              <div className="w-2 h-2 bg-slate-800 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
-            </div>
-          )}
+            )}
+          </div>
+        );
+      }
+      grid.push(
+        <div key={f} className="flex gap-4 justify-center">
+          {rowSeats}
         </div>
       );
     }
-    return seats;
+    return grid;
   };
 
   return (
     <div className="space-y-8">
       <header>
         <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Mapa de Sala</h1>
-        <p className="text-slate-500 mt-1">Visualize e organize a disposição dos alunos em sala.</p>
+        <p className="text-slate-500 mt-1">Visualize e organize a disposição dos alunos por fileira e assento.</p>
       </header>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
@@ -3328,12 +3422,14 @@ const MapaDeSala = () => {
 
         {selectedTurma ? (
           <div className="space-y-8">
-            <div className="bg-slate-50 p-10 rounded-[40px] border border-slate-100">
-              <div className="max-w-md mx-auto bg-white py-4 rounded-xl border border-slate-200 text-center mb-12 font-bold text-slate-400 uppercase tracking-widest text-xs">
-                Quadro / Professor
-              </div>
-              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6 justify-items-center">
-                {renderSeats()}
+            <div className="bg-slate-50 p-10 rounded-[40px] border border-slate-100 overflow-x-auto">
+              <div className="min-w-[600px] space-y-6">
+                <div className="max-w-md mx-auto bg-white py-4 rounded-xl border border-slate-200 text-center mb-12 font-bold text-slate-400 uppercase tracking-widest text-xs">
+                  Quadro / Professor
+                </div>
+                <div className="flex flex-col gap-6">
+                  {renderSeats()}
+                </div>
               </div>
             </div>
 
@@ -3341,22 +3437,32 @@ const MapaDeSala = () => {
               <div className="bg-white p-6 rounded-2xl border border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-4">Alunos sem lugar definido</h3>
                 <div className="space-y-2">
-                  {alunosDaTurma.filter(a => !a.posicao_sala).map(a => (
-                    <div key={a.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                      <span className="text-sm font-medium text-slate-700">{a.nome}</span>
-                      <select 
-                        onChange={(e) => handleAssignSeat(parseInt(e.target.value), a.id)}
-                        className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none"
-                      >
-                        <option value="">Atribuir lugar...</option>
-                        {Array.from({ length: selectedTurma.capacidade || 30 }, (_, i) => i + 1)
-                          .filter(pos => !alunosDaTurma.find(al => al.posicao_sala === pos))
-                          .map(pos => <option key={pos} value={pos}>Lugar {pos}</option>)
-                        }
-                      </select>
+                  {alunosDaTurma.filter(a => !a.fileira || !a.assento).map(a => (
+                    <div key={a.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl gap-4">
+                      <span className="text-sm font-medium text-slate-700 truncate flex-1">{a.nome}</span>
+                      <div className="flex gap-2">
+                        <input 
+                          type="number" 
+                          placeholder="Fil" 
+                          className="w-12 text-xs border rounded p-1"
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val) a._tempFileira = val;
+                          }}
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Ass" 
+                          className="w-12 text-xs border rounded p-1"
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val && a._tempFileira) handleAssignSeat(a._tempFileira, val, a.id);
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
-                  {alunosDaTurma.filter(a => !a.posicao_sala).length === 0 && (
+                  {alunosDaTurma.filter(a => !a.fileira || !a.assento).length === 0 && (
                     <p className="text-sm text-slate-400 italic">Todos os alunos possuem lugar definido.</p>
                   )}
                 </div>
@@ -3399,6 +3505,7 @@ const Funcionarios = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log('Salvando funcionário:', formData);
       if (editingItem) {
         await api.post(`/funcionarios/${editingItem.id}`, formData);
       } else {
@@ -3408,8 +3515,9 @@ const Funcionarios = () => {
       setEditingItem(null);
       setFormData({});
       fetchData();
-    } catch (err) {
-      alert('Erro ao salvar funcionário');
+    } catch (err: any) {
+      console.error('Erro ao salvar funcionário:', err.response?.data || err.message);
+      alert(`Erro ao salvar funcionário: ${err.response?.data?.error || err.message}`);
     }
   };
 
@@ -4170,18 +4278,47 @@ const ProfessorPortal = () => {
   const [dataFreq, setDataFreq] = useState(new Date().toISOString().split('T')[0]);
   const [frequenciaData, setFrequenciaData] = useState<any>({});
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('lancamento');
+  const [historicoNotas, setHistoricoNotas] = useState<any[]>([]);
+  const [historicoFreq, setHistoricoFreq] = useState<any[]>([]);
 
-  useEffect(() => {
-    Promise.all([
+  const fetchData = async () => {
+    const [a, t, d] = await Promise.all([
       api.get('/alunos'),
       api.get('/turmas'),
       api.get('/disciplinas')
-    ]).then(([a, t, d]) => {
-      setAlunos(a.data);
-      setTurmas(t.data);
-      setDisciplinas(d.data);
-    });
+    ]);
+    setAlunos(a.data);
+    setTurmas(t.data);
+    setDisciplinas(d.data);
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
+
+  const fetchHistorico = async () => {
+    if (!turmaId || !disciplinaId) return;
+    setLoading(true);
+    try {
+      const [nRes, fRes] = await Promise.all([
+        api.get(`/notas-turma/${turmaId}/${disciplinaId}/${bimestre}`),
+        api.get(`/frequencia-turma/${turmaId}/${disciplinaId}/${dataFreq}`)
+      ]);
+      setHistoricoNotas(nRes.data);
+      setHistoricoFreq(fRes.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'historico') {
+      fetchHistorico();
+    }
+  }, [activeTab, turmaId, disciplinaId, bimestre, dataFreq]);
 
   useEffect(() => {
     if (turmaId) {
@@ -4206,20 +4343,23 @@ const ProfessorPortal = () => {
     }
     setLoading(true);
     try {
-      const promises = Object.entries(notasColetivas).map(([id, data]: [string, any]) => {
-        if (!data.valor && !data.conceito && !data.observacao) return Promise.resolve();
-        return api.post('/notas', { 
-          aluno_id: id, 
-          disciplina_id: disciplinaId, 
-          turma_id: turmaId,
-          bimestre: parseInt(bimestre),
+      const notas = Object.entries(notasColetivas)
+        .filter(([_, data]: [string, any]) => data.valor || data.conceito || data.observacao)
+        .map(([id, data]: [string, any]) => ({
+          aluno_id: parseInt(id),
           valor: data.valor ? parseFloat(data.valor) : null,
           conceito: data.conceito || null,
           observacao: data.observacao || null
-        });
+        }));
+
+      await api.post('/notas-coletivas', { 
+        turma_id: parseInt(turmaId),
+        disciplina_id: parseInt(disciplinaId),
+        bimestre: parseInt(bimestre),
+        notas
       });
-      await Promise.all(promises);
       alert('Notas lançadas com sucesso!');
+      if (activeTab === 'historico') fetchHistorico();
     } catch (err) {
       alert('Erro ao lançar notas');
     } finally {
@@ -4230,17 +4370,20 @@ const ProfessorPortal = () => {
   const handleLancarFrequenciaColetiva = async () => {
     setLoading(true);
     try {
-      const promises = Object.entries(frequenciaData).map(([id, status]) => 
-        api.post('/frequencia', { 
-          aluno_id: id, 
-          data: dataFreq, 
-          status: status,
-          turma_id: turmaId || null,
-          disciplina_id: disciplinaId || null
-        })
-      );
-      await Promise.all(promises);
+      const frequencias = Object.entries(frequenciaData).map(([id, status]) => ({
+        aluno_id: parseInt(id),
+        status,
+        justificativa: ''
+      }));
+
+      await api.post('/frequencia-coletiva', { 
+        turma_id: parseInt(turmaId),
+        disciplina_id: parseInt(disciplinaId),
+        data: dataFreq,
+        frequencias
+      });
       alert('Frequência coletiva registrada com sucesso!');
+      if (activeTab === 'historico') fetchHistorico();
     } catch (err) {
       alert('Erro ao registrar frequência');
     } finally {
@@ -4256,9 +4399,31 @@ const ProfessorPortal = () => {
 
   return (
     <div className="space-y-10">
-      <header>
-        <h1 className="text-3xl font-bold text-slate-800">Diário de Classe</h1>
-        <p className="text-slate-500">Lançamento coletivo de notas e frequência.</p>
+      <header className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">Diário de Classe</h1>
+          <p className="text-slate-500">Gestão de notas e frequência.</p>
+        </div>
+        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100">
+          <button
+            onClick={() => setActiveTab('lancamento')}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+              activeTab === 'lancamento' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            Lançamento
+          </button>
+          <button
+            onClick={() => setActiveTab('historico')}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
+              activeTab === 'historico' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            Histórico
+          </button>
+        </div>
       </header>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
@@ -4286,111 +4451,113 @@ const ProfessorPortal = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Bimestre</label>
-            <select
-              value={bimestre}
-              onChange={(e) => setBimestre(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-            >
-              <option value="1">1º Bimestre</option>
-              <option value="2">2º Bimestre</option>
-              <option value="3">3º Bimestre</option>
-              <option value="4">4º Bimestre</option>
-            </select>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Bimestre / Data</label>
+            <div className="flex gap-2">
+              <select
+                value={bimestre}
+                onChange={(e) => setBimestre(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+              >
+                <option value="1">1º Bim</option>
+                <option value="2">2º Bim</option>
+                <option value="3">3º Bim</option>
+                <option value="4">4º Bim</option>
+              </select>
+              <input
+                type="date"
+                value={dataFreq}
+                onChange={(e) => setDataFreq(e.target.value)}
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
           </div>
         </div>
 
         {turmaId && disciplinaId ? (
-          <div className="space-y-10">
-            <section>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <BookOpen className="text-indigo-600" size={24} />
-                  Lançamento de Notas Coletivo
-                </h2>
-                <button
-                  onClick={handleLancarNotasColetivas}
-                  disabled={loading || filteredAlunos.length === 0}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Salvando...' : 'Salvar Notas'}
-                </button>
-              </div>
-              <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Avaliação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {filteredAlunos.map(a => (
-                      <tr key={a.id}>
-                        <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
-                        <td className="px-6 py-4">
-                          {selectedDisciplina?.tipo_avaliacao === 'nota' && (
-                            <input
-                              type="number"
-                              step="0.1"
-                              max="10"
-                              min="0"
-                              value={notasColetivas[a.id]?.valor || ''}
-                              onChange={(e) => setNotasColetivas({
-                                ...notasColetivas,
-                                [a.id]: { ...notasColetivas[a.id], valor: e.target.value }
-                              })}
-                              className="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                              placeholder="0.0"
-                            />
-                          )}
-                          {selectedDisciplina?.tipo_avaliacao === 'conceito' && (
-                            <select
-                              value={notasColetivas[a.id]?.conceito || ''}
-                              onChange={(e) => setNotasColetivas({
-                                ...notasColetivas,
-                                [a.id]: { ...notasColetivas[a.id], conceito: e.target.value }
-                              })}
-                              className="w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                            >
-                              <option value="">Selecione</option>
-                              <option value="Iniciado">Iniciado (I)</option>
-                              <option value="Em Desenvolvimento">Em Desenvolvimento (ED)</option>
-                              <option value="Desenvolvido">Desenvolvido (D)</option>
-                            </select>
-                          )}
-                          {selectedDisciplina?.tipo_avaliacao === 'descritivo' && (
-                            <textarea
-                              value={notasColetivas[a.id]?.observacao || ''}
-                              onChange={(e) => setNotasColetivas({
-                                ...notasColetivas,
-                                [a.id]: { ...notasColetivas[a.id], observacao: e.target.value }
-                              })}
-                              className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none h-20"
-                              placeholder="Relatório descritivo..."
-                            />
-                          )}
-                        </td>
+          activeTab === 'lancamento' ? (
+            <div className="space-y-10">
+              <section>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <BookOpen className="text-indigo-600" size={24} />
+                    Lançamento de Notas Coletivo
+                  </h2>
+                  <button
+                    onClick={handleLancarNotasColetivas}
+                    disabled={loading || filteredAlunos.length === 0}
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Salvando...' : 'Salvar Notas'}
+                  </button>
+                </div>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Avaliação</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredAlunos.map(a => (
+                        <tr key={a.id}>
+                          <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                          <td className="px-6 py-4">
+                            {selectedDisciplina?.tipo_avaliacao === 'nota' && (
+                              <input
+                                type="number"
+                                step="0.1"
+                                max="10"
+                                min="0"
+                                value={notasColetivas[a.id]?.valor || ''}
+                                onChange={(e) => setNotasColetivas({
+                                  ...notasColetivas,
+                                  [a.id]: { ...notasColetivas[a.id], valor: e.target.value }
+                                })}
+                                className="w-24 px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="0.0"
+                              />
+                            )}
+                            {selectedDisciplina?.tipo_avaliacao === 'conceito' && (
+                              <select
+                                value={notasColetivas[a.id]?.conceito || ''}
+                                onChange={(e) => setNotasColetivas({
+                                  ...notasColetivas,
+                                  [a.id]: { ...notasColetivas[a.id], conceito: e.target.value }
+                                })}
+                                className="w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                              >
+                                <option value="">Selecione</option>
+                                <option value="Iniciado">Iniciado (I)</option>
+                                <option value="Em Desenvolvimento">Em Desenvolvimento (ED)</option>
+                                <option value="Desenvolvido">Desenvolvido (D)</option>
+                              </select>
+                            )}
+                            {selectedDisciplina?.tipo_avaliacao === 'descritivo' && (
+                              <textarea
+                                value={notasColetivas[a.id]?.observacao || ''}
+                                onChange={(e) => setNotasColetivas({
+                                  ...notasColetivas,
+                                  [a.id]: { ...notasColetivas[a.id], observacao: e.target.value }
+                                })}
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none h-20"
+                                placeholder="Relatório descritivo..."
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
 
-            <section>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <ClipboardCheck className="text-indigo-600" size={24} />
-                  Diário de Classe (Frequência)
-                </h2>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="date"
-                    value={dataFreq}
-                    onChange={(e) => setDataFreq(e.target.value)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
+              <section>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <ClipboardCheck className="text-indigo-600" size={24} />
+                    Diário de Classe (Frequência)
+                  </h2>
                   <button
                     onClick={handleLancarFrequenciaColetiva}
                     disabled={loading || filteredAlunos.length === 0}
@@ -4399,46 +4566,158 @@ const ProfessorPortal = () => {
                     {loading ? 'Salvando...' : 'Salvar Frequência'}
                   </button>
                 </div>
-              </div>
-              <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {filteredAlunos.map(a => (
-                      <tr key={a.id}>
-                        <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex justify-center gap-2">
-                            {['P', 'F', 'FJ'].map((status) => (
-                              <button
-                                key={status}
-                                onClick={() => setFrequenciaData({ ...frequenciaData, [a.id]: status })}
-                                className={cn(
-                                  "w-8 h-8 rounded-lg text-[10px] font-bold transition-all border",
-                                  (frequenciaData[a.id] || 'P') === status
-                                    ? status === 'P' ? "bg-emerald-600 text-white border-emerald-600" :
-                                      status === 'F' ? "bg-red-600 text-white border-red-600" :
-                                      "bg-amber-500 text-white border-amber-500"
-                                    : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
-                                )}
-                              >
-                                {status}
-                              </button>
-                            ))}
-                          </div>
-                        </td>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredAlunos.map(a => (
+                        <tr key={a.id}>
+                          <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex justify-center gap-2">
+                              {['P', 'F', 'FJ'].map((status) => (
+                                <button
+                                  key={status}
+                                  onClick={() => setFrequenciaData({ ...frequenciaData, [a.id]: status })}
+                                  className={cn(
+                                    "w-8 h-8 rounded-lg text-[10px] font-bold transition-all border",
+                                    (frequenciaData[a.id] || 'P') === status
+                                      ? status === 'P' ? "bg-emerald-600 text-white border-emerald-600" :
+                                        status === 'F' ? "bg-red-600 text-white border-red-600" :
+                                        "bg-amber-500 text-white border-amber-500"
+                                      : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
+                                  )}
+                                >
+                                  {status}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div className="space-y-10">
+              <section>
+                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <BookOpen className="text-indigo-600" size={24} />
+                  Histórico de Notas ({bimestre}º Bimestre)
+                </h2>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Nota/Conceito</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Observação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredAlunos.map(a => {
+                        const nota = historicoNotas.find(n => n.aluno_id === a.id);
+                        return (
+                          <tr key={a.id}>
+                            <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                {selectedDisciplina?.tipo_avaliacao === 'nota' ? (
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    defaultValue={nota?.valor || ''}
+                                    onBlur={(e) => {
+                                      const val = parseFloat(e.target.value);
+                                      if (!isNaN(val)) {
+                                        api.post('/notas', { 
+                                          aluno_id: a.id, 
+                                          disciplina_id: disciplinaId, 
+                                          turma_id: turmaId,
+                                          bimestre: parseInt(bimestre),
+                                          valor: val
+                                        });
+                                      }
+                                    }}
+                                    className="w-20 px-2 py-1 border rounded"
+                                  />
+                                ) : (
+                                  <span className="font-bold text-indigo-600">{nota?.conceito || '-'}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-500 italic">{nota?.observacao || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <ClipboardCheck className="text-indigo-600" size={24} />
+                  Histórico de Frequência ({new Date(dataFreq).toLocaleDateString('pt-BR')})
+                </h2>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredAlunos.map(a => {
+                        const freq = historicoFreq.find(f => f.aluno_id === a.id);
+                        return (
+                          <tr key={a.id}>
+                            <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex justify-center gap-2">
+                                {['P', 'F', 'FJ'].map((status) => (
+                                  <button
+                                    key={status}
+                                    onClick={() => {
+                                      api.post('/frequencia', { 
+                                        aluno_id: a.id, 
+                                        data: dataFreq, 
+                                        status: status,
+                                        turma_id: turmaId,
+                                        disciplina_id: disciplinaId
+                                      }).then(() => fetchHistorico());
+                                    }}
+                                    className={cn(
+                                      "w-8 h-8 rounded-lg text-[10px] font-bold transition-all border",
+                                      (freq?.status || 'P') === status
+                                        ? status === 'P' ? "bg-emerald-600 text-white border-emerald-600" :
+                                          status === 'F' ? "bg-red-600 text-white border-red-600" :
+                                          "bg-amber-500 text-white border-amber-500"
+                                        : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
+                                    )}
+                                  >
+                                    {status}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          )
         ) : (
           <div className="p-20 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-3xl">
             Selecione uma turma e uma disciplina para carregar o diário.
