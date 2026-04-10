@@ -639,7 +639,7 @@ app.get('/api/health', async (c) => {
     app.get('/api/usuarios', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
-      const rows = await db.prepare("SELECT id, nome, email, perfil FROM usuarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
+      const rows = await db.prepare("SELECT id, nome, email, perfil, aluno_id, professor_id FROM usuarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
       return c.json(rows);
     });
 

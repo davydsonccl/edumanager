@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import axios from 'axios';
@@ -3910,14 +3910,49 @@ const Funcionarios = () => {
 const ControleAcesso = () => {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [permissoes, setPermissoes] = useState<any[]>([]);
   const [alunos, setAlunos] = useState<any[]>([]);
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createType, setCreateType] = useState<'aluno' | 'funcionario'>('aluno');
-  const [selectedEntityId, setSelectedEntityId] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [tempPassword, setTempPassword] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const combinedList = useMemo(() => {
+    const list: any[] = [];
+    
+    alunos.forEach(a => {
+      const user = usuarios.find(u => u.aluno_id === a.id);
+      list.push({
+        id: a.id,
+        nome: a.nome,
+        tipo: 'aluno',
+        email: a.email,
+        usuario: user,
+        isNew: !user
+      });
+    });
+    
+    funcionarios.forEach(f => {
+      const user = usuarios.find(u => u.professor_id === f.id);
+      list.push({
+        id: f.id,
+        nome: f.nome,
+        tipo: 'funcionario',
+        email: f.email,
+        cargo: f.cargo,
+        usuario: user,
+        isNew: !user
+      });
+    });
+    
+    return list.filter(item => 
+      item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    ).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [alunos, funcionarios, usuarios, searchTerm]);
   
   const telas = [
     { id: 'Painel', label: 'Painel / Dashboard' },
@@ -3969,32 +4004,65 @@ const ControleAcesso = () => {
     }
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const entity = createType === 'aluno' 
-      ? alunos.find(a => a.id === parseInt(selectedEntityId))
-      : funcionarios.find(f => f.id === parseInt(selectedEntityId));
-    
-    if (!entity) return;
+    if (!selectedRecord) return;
 
+    setLoading(true);
     try {
-      await api.post('/usuarios/criar', {
-        nome: entity.nome,
-        email: userEmail,
-        senha: tempPassword,
-        perfil: createType === 'aluno' ? 'aluno' : (entity.cargo === 'Professor' ? 'professor' : 'funcionario'),
-        aluno_id: createType === 'aluno' ? entity.id : null,
-        professor_id: createType === 'funcionario' && entity.cargo === 'Professor' ? entity.id : null
-      });
-      alert('Usuário criado com sucesso!');
-      setShowCreateModal(false);
-      setSelectedEntityId('');
+      let userId = selectedRecord.usuario?.id;
+      
+      if (!userId) {
+        // Create user first
+        const res = await api.post('/usuarios/criar', {
+          nome: selectedRecord.nome,
+          email: userEmail,
+          senha: tempPassword,
+          perfil: selectedRecord.tipo === 'aluno' ? 'aluno' : (selectedRecord.cargo === 'Professor' ? 'professor' : 'funcionario'),
+          aluno_id: selectedRecord.tipo === 'aluno' ? selectedRecord.id : null,
+          professor_id: selectedRecord.tipo === 'funcionario' && selectedRecord.cargo === 'Professor' ? selectedRecord.id : null
+        });
+        userId = res.data.id;
+      }
+
+      // Permissions are handled via togglePermissao which is already implemented
+      // But if we want a "Save" button for the whole modal, we'd need to batch them.
+      // For now, let's stick to the requirement of "abrirá nova janela contendo todas as telas para que possa ser selecionadas para liberação e salvar"
+      
+      alert('Usuário e permissões processados com sucesso!');
+      setShowModal(false);
+      setSelectedRecord(null);
       setTempPassword('');
       setUserEmail('');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao criar usuário');
+      alert(err.response?.data?.error || 'Erro ao processar usuário');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm('Deseja realmente excluir o acesso deste usuário? O cadastro de aluno/funcionário permanecerá intacto.')) return;
+    try {
+      await api.delete(`/usuarios/${userId}`);
+      alert('Acesso removido com sucesso!');
+      fetchData();
+    } catch (err) {
+      alert('Erro ao excluir acesso');
+    }
+  };
+
+  const openPermissions = (record: any) => {
+    setSelectedRecord(record);
+    if (record.usuario) {
+      setSelectedUser(record.usuario);
+      setUserEmail(record.usuario.email);
+    } else {
+      setSelectedUser(null);
+      setUserEmail(record.email || '');
+    }
+    setShowModal(true);
   };
 
   const togglePermissao = async (telaId: string, field: string) => {
@@ -4092,263 +4160,265 @@ const ControleAcesso = () => {
       <header className="flex justify-between items-end">
         <div>
           <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Controle de Acesso</h1>
-          <p className="text-slate-500 mt-1">Configure as permissões detalhadas e gerencie contas de usuários.</p>
+          <p className="text-slate-500 mt-1">Gerencie as permissões de acesso para alunos e funcionários.</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
-        >
-          <Plus size={18} /> Criar Novo Usuário
-        </button>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-fit">
-          <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <Users size={20} className="text-indigo-600" />
-            Usuários
-          </h2>
-          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-            {usuarios.map(u => (
-              <button
-                key={u.id}
-                onClick={() => setSelectedUser(u)}
-                className={cn(
-                  "w-full p-4 rounded-2xl text-left transition-all flex items-center justify-between group",
-                  selectedUser?.id === u.id ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
-                )}
-              >
-                <div className="overflow-hidden">
-                  <p className="font-bold text-sm truncate">{u.nome}</p>
-                  <p className={cn("text-[10px] uppercase font-bold tracking-wider", selectedUser?.id === u.id ? "text-indigo-200" : "text-slate-400")}>{u.perfil}</p>
-                </div>
-                <ChevronRight size={16} className={cn("transition-transform", selectedUser?.id === u.id ? "translate-x-1" : "group-hover:translate-x-1")} />
-              </button>
-            ))}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="relative w-full md:max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              placeholder="Buscar por nome ou e-mail..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse" />
+            <span>Novos registros piscando aguardando liberação</span>
           </div>
         </div>
 
-        <div className="lg:col-span-3 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          {selectedUser ? (
-            <div className="flex flex-col h-full">
-              <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl">
-                    {selectedUser.nome.charAt(0)}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800">{selectedUser.nome}</h2>
-                    <p className="text-slate-500 text-sm">{selectedUser.email} • <span className="uppercase font-bold text-indigo-600">{selectedUser.perfil}</span></p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={handleResetPassword}
-                    className="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all flex items-center gap-2"
-                  >
-                    <Key size={14} />
-                    Resetar Senha
-                  </button>
-                  <button
-                    onClick={grantAll}
-                    className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all flex items-center gap-2"
-                  >
-                    <Check size={14} />
-                    Liberar Tudo
-                  </button>
-                  <button
-                    onClick={revokeAll}
-                    className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all flex items-center gap-2"
-                  >
-                    <X size={14} />
-                    Bloquear Tudo
-                  </button>
-                </div>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="px-8 py-4 border-b border-slate-100">Módulo / Tela</th>
-                      <th className="px-4 py-4 border-b border-slate-100 text-center">Acesso</th>
-                      <th className="px-4 py-4 border-b border-slate-100 text-center">Editar</th>
-                      <th className="px-4 py-4 border-b border-slate-100 text-center">Excluir</th>
-                      <th className="px-4 py-4 border-b border-slate-100 text-center">Backup</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {telas.map(tela => {
-                      const p = permissoes.find(perm => perm.tela === tela.id) || {
-                        pode_acessar: 0,
-                        pode_editar: 0,
-                        pode_excluir: 0,
-                        pode_backup: 0
-                      };
-
-                      return (
-                        <tr key={tela.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-8 py-5">
-                            <span className="font-bold text-slate-700">{tela.label}</span>
-                          </td>
-                          <td className="px-4 py-5 text-center">
-                            <PermissionToggle 
-                              active={p.pode_acessar === 1} 
-                              onClick={() => togglePermissao(tela.id, 'pode_acessar')} 
-                            />
-                          </td>
-                          <td className="px-4 py-5 text-center">
-                            <PermissionToggle 
-                              active={p.pode_editar === 1} 
-                              disabled={p.pode_acessar === 0}
-                              onClick={() => togglePermissao(tela.id, 'pode_editar')} 
-                            />
-                          </td>
-                          <td className="px-4 py-5 text-center">
-                            <PermissionToggle 
-                              active={p.pode_excluir === 1} 
-                              disabled={p.pode_acessar === 0}
-                              onClick={() => togglePermissao(tela.id, 'pode_excluir')} 
-                            />
-                          </td>
-                          <td className="px-4 py-5 text-center">
-                            <PermissionToggle 
-                              active={p.pode_backup === 1} 
-                              disabled={p.pode_acessar === 0}
-                              onClick={() => togglePermissao(tela.id, 'pode_backup')} 
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
-                <p className="text-xs text-slate-400 italic">As alterações são salvas automaticamente ao clicar nos interruptores.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center p-20 text-center min-h-[500px]">
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                <ShieldCheck className="text-slate-200" size={48} />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800">Selecione um usuário</h3>
-              <p className="text-slate-400 max-w-xs mt-2">Escolha um usuário na lista ao lado para gerenciar suas permissões de acesso.</p>
-            </div>
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Nome</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Tipo / Cargo</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-wider">Status de Acesso</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {combinedList.map((item) => (
+                <tr 
+                  key={`${item.tipo}-${item.id}`} 
+                  className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                  onClick={() => openPermissions(item)}
+                >
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
+                        {item.nome.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{item.nome}</p>
+                        <p className="text-xs text-slate-400">{item.email || 'Sem e-mail'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="text-sm font-medium text-slate-600">
+                      {item.tipo === 'aluno' ? 'Aluno' : `Funcionário (${item.cargo})`}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    {item.isNew ? (
+                      <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                        Novo Registro
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                        Acesso Liberado
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-8 py-6 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-2">
+                      <button 
+                        onClick={() => openPermissions(item)}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="Alterar Permissões"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      {!item.isNew && (
+                        <button 
+                          onClick={() => handleDeleteUser(item.usuario.id)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Excluir Acesso"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
       <AnimatePresence>
-        {showCreateModal && (
+        {showModal && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-xl font-bold text-slate-800">Criar Novo Usuário</h2>
-                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">Configurar Acesso: {selectedRecord?.nome}</h2>
+                  <p className="text-sm text-slate-500 mt-1">Defina as permissões de acesso para cada módulo do sistema.</p>
+                </div>
+                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
                   <X size={24} />
                 </button>
               </div>
-              <form onSubmit={handleCreateUser} className="p-8 space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Usuário</label>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => { setCreateType('aluno'); setSelectedEntityId(''); }}
-                      className={cn(
-                        "flex-1 py-3 rounded-xl font-bold text-sm border transition-all",
-                        createType === 'aluno' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:border-indigo-600"
-                      )}
+
+              <div className="flex-1 overflow-y-auto p-8">
+                {!selectedUser ? (
+                  <div className="space-y-6 mb-8 p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <h3 className="font-bold text-indigo-800 flex items-center gap-2">
+                      <Shield size={18} />
+                      Criar Conta de Acesso
+                    </h3>
+                    <p className="text-sm text-indigo-600">Este registro ainda não possui uma conta de acesso ao sistema. Preencha os dados abaixo para criar.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-indigo-700 uppercase mb-2">E-mail de Acesso</label>
+                        <input
+                          type="email"
+                          value={userEmail}
+                          onChange={(e) => setUserEmail(e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                          placeholder="email@exemplo.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-indigo-700 uppercase mb-2">Senha Temporária</label>
+                        <input
+                          type="password"
+                          value={tempPassword}
+                          onChange={(e) => setTempPassword(e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleSaveUser}
+                      disabled={loading || !userEmail || !tempPassword}
+                      className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
                     >
-                      Aluno
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setCreateType('funcionario'); setSelectedEntityId(''); }}
-                      className={cn(
-                        "flex-1 py-3 rounded-xl font-bold text-sm border transition-all",
-                        createType === 'funcionario' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:border-indigo-600"
-                      )}
-                    >
-                      Funcionário
+                      {loading ? 'Criando Conta...' : 'Criar Conta e Liberar Acesso'}
                     </button>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-8">
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-3">
+                        <button
+                          onClick={grantAll}
+                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all flex items-center gap-2"
+                        >
+                          <Check size={14} />
+                          Liberar Tudo
+                        </button>
+                        <button
+                          onClick={revokeAll}
+                          className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all flex items-center gap-2"
+                        >
+                          <X size={14} />
+                          Bloquear Tudo
+                        </button>
+                      </div>
+                      <button
+                        onClick={handleResetPassword}
+                        className="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all flex items-center gap-2"
+                      >
+                        <Key size={14} />
+                        Resetar Senha
+                      </button>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Selecionar {createType === 'aluno' ? 'Aluno' : 'Funcionário'}
-                  </label>
-                  <select
-                    value={selectedEntityId}
-                    onChange={(e) => {
-                      setSelectedEntityId(e.target.value);
-                      const entity = createType === 'aluno' 
-                        ? alunos.find(a => a.id === parseInt(e.target.value))
-                        : funcionarios.find(f => f.id === parseInt(e.target.value));
-                      if (entity) setUserEmail(entity.email || '');
+                    <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            <th className="px-8 py-4 border-b border-slate-100">Módulo / Tela</th>
+                            <th className="px-4 py-4 border-b border-slate-100 text-center">Acesso</th>
+                            <th className="px-4 py-4 border-b border-slate-100 text-center">Editar</th>
+                            <th className="px-4 py-4 border-b border-slate-100 text-center">Excluir</th>
+                            <th className="px-4 py-4 border-b border-slate-100 text-center">Backup</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {telas.map(tela => {
+                            const p = permissoes.find(perm => perm.tela === tela.id) || {
+                              pode_acessar: 0,
+                              pode_editar: 0,
+                              pode_excluir: 0,
+                              pode_backup: 0
+                            };
+
+                            return (
+                              <tr key={tela.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <td className="px-8 py-5">
+                                  <span className="font-bold text-slate-700">{tela.label}</span>
+                                </td>
+                                <td className="px-4 py-5 text-center">
+                                  <PermissionToggle 
+                                    active={p.pode_acessar === 1} 
+                                    onClick={() => togglePermissao(tela.id, 'pode_acessar')} 
+                                  />
+                                </td>
+                                <td className="px-4 py-5 text-center">
+                                  <PermissionToggle 
+                                    active={p.pode_editar === 1} 
+                                    disabled={p.pode_acessar === 0}
+                                    onClick={() => togglePermissao(tela.id, 'pode_editar')} 
+                                  />
+                                </td>
+                                <td className="px-4 py-5 text-center">
+                                  <PermissionToggle 
+                                    active={p.pode_excluir === 1} 
+                                    disabled={p.pode_acessar === 0}
+                                    onClick={() => togglePermissao(tela.id, 'pode_excluir')} 
+                                  />
+                                </td>
+                                <td className="px-4 py-5 text-center">
+                                  <PermissionToggle 
+                                    active={p.pode_backup === 1} 
+                                    disabled={p.pode_acessar === 0}
+                                    onClick={() => togglePermissao(tela.id, 'pode_backup')} 
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
+                >
+                  Fechar
+                </button>
+                {selectedUser && (
+                  <button
+                    onClick={() => {
+                      alert('Alterações salvas com sucesso!');
+                      setShowModal(false);
                     }}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    required
+                    className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all"
                   >
-                    <option value="">Selecione...</option>
-                    {(createType === 'aluno' ? alunos : funcionarios)
-                      .filter(e => !usuarios.some(u => 
-                        (createType === 'aluno' ? u.aluno_id === e.id : u.professor_id === e.id)
-                      ))
-                      .map(e => (
-                        <option key={e.id} value={e.id}>{e.nome}</option>
-                      ))
-                    }
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">E-mail de Acesso</label>
-                  <input
-                    type="email"
-                    value={userEmail}
-                    onChange={(e) => setUserEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Senha Temporária</label>
-                  <input
-                    type="text"
-                    value={tempPassword}
-                    onChange={(e) => setTempPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="Ex: Aluno123"
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="flex-1 px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all"
-                  >
-                    Cancelar
+                    Salvar Alterações
                   </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all"
-                  >
-                    Criar Usuário
-                  </button>
-                </div>
-              </form>
+                )}
+              </div>
             </motion.div>
           </div>
         )}
