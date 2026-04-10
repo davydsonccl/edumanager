@@ -33,7 +33,6 @@ class DBWrapper {
           const res = await stmt.bind(...params).run();
           return { lastInsertRowid: res.meta.last_row_id };
         } catch (e: any) {
-          console.error(`DB Error (run): ${e.message} | Query: ${query}`);
           throw e;
         }
       }
@@ -44,7 +43,6 @@ class DBWrapper {
     try {
       await this.d1.exec(query);
     } catch (e: any) {
-      console.error(`DB Error (exec): ${e.message} | Query: ${query}`);
       throw e;
     }
   }
@@ -306,8 +304,32 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       }
     }
 
-    // Migrations for existing tables (redundant as they are in CREATE TABLE above)
-    // Removed to avoid duplicate column errors in logs
+    // Migrations for existing tables
+    const migrations = [
+      "ALTER TABLE usuarios ADD COLUMN curso_id INTEGER",
+      "ALTER TABLE usuarios ADD COLUMN turma_id INTEGER",
+      "ALTER TABLE usuarios ADD COLUMN ano_letivo INTEGER",
+      "ALTER TABLE empresas ADD COLUMN msg_cobranca_whatsapp TEXT",
+      "ALTER TABLE empresas ADD COLUMN msg_cobranca_email TEXT",
+      "ALTER TABLE alunos ADD COLUMN posicao_sala INTEGER",
+      "ALTER TABLE alunos ADD COLUMN fileira INTEGER",
+      "ALTER TABLE alunos ADD COLUMN assento INTEGER",
+      "ALTER TABLE alunos ADD COLUMN whatsapp_responsavel TEXT",
+      "ALTER TABLE alunos ADD COLUMN email_responsavel TEXT",
+      "ALTER TABLE funcionarios ADD COLUMN disciplina_id INTEGER",
+      "ALTER TABLE funcionarios ADD COLUMN turma_id INTEGER"
+    ];
+
+    for (const m of migrations) {
+      try {
+        await db.exec(m);
+      } catch (e: any) {
+        // Ignore errors like "duplicate column name"
+        if (!e.message.includes("duplicate column name")) {
+          console.error(`Migration Error: ${e.message} | Query: ${m}`);
+        }
+      }
+    }
 
     // Seed initial data
     const empresaCount = await db.prepare("SELECT count(*) as count FROM empresas").get() as any;
@@ -460,11 +482,15 @@ app.get('/api/health', async (c) => {
     });
 
     app.post('/api/empresa', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
-
-      const { nome, cnpj, endereco, telefone, email, diretor, secretario } = await c.req.json();
-      await db.prepare("UPDATE empresas SET nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, diretor = ?, secretario = ? WHERE id = ?")
-        .run(nome, cnpj, endereco, telefone, email, diretor, secretario, c.get('user').empresa_id);
+      const db = new DBWrapper(c.env.DB);
+      const { nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email } = await c.req.json();
+      await db.prepare(`
+        UPDATE empresas SET 
+          nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, 
+          diretor = ?, secretario = ?, logo_url = ?, 
+          msg_cobranca_whatsapp = ?, msg_cobranca_email = ? 
+        WHERE id = ?
+      `).run(nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, c.get('user').empresa_id);
       return c.json({ success: true });
     });
 

@@ -2637,6 +2637,36 @@ const Settings = () => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" 
               />
             </div>
+            <div className="col-span-2 pt-4 border-t border-slate-100 mt-4">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <MessageSquare size={18} className="text-indigo-600" />
+                Mensagens de Cobrança (Templates)
+              </h3>
+              <div className="grid grid-cols-1 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Template WhatsApp</label>
+                  <textarea 
+                    value={empresa.msg_cobranca_whatsapp || ''} 
+                    onChange={(e) => setEmpresa({...empresa, msg_cobranca_whatsapp: e.target.value})}
+                    rows={3}
+                    placeholder="Ex: Olá {responsavel}, lembramos que a mensalidade de {aluno} no valor de R$ {valor} está pendente."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 resize-none" 
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 italic">Tags: {'{aluno}'}, {'{responsavel}'}, {'{valor}'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Template E-mail</label>
+                  <textarea 
+                    value={empresa.msg_cobranca_email || ''} 
+                    onChange={(e) => setEmpresa({...empresa, msg_cobranca_email: e.target.value})}
+                    rows={3}
+                    placeholder="Ex: Prezado(a) {responsavel}, informamos que consta um débito em aberto para o aluno {aluno}..."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 resize-none" 
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 italic">Tags: {'{aluno}'}, {'{responsavel}'}, {'{valor}'}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
