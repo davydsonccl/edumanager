@@ -43,7 +43,9 @@ import {
   MessageCircle,
   Mail,
   HelpCircle,
-  AlertTriangle
+  AlertTriangle,
+  ArrowRightLeft,
+  FileCheck
 } from 'lucide-react';
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -100,10 +102,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userPerms, setUserPerms] = useState<any[]>([]);
   const [loadingPerms, setLoadingPerms] = useState(true);
+  const [todasEmpresas, setTodasEmpresas] = useState<any[]>([]);
+  const [activeEmpresaId, setActiveEmpresaId] = useState(localStorage.getItem('activeEmpresaId') || user.empresa_id);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('activeEmpresaId');
     navigate('/login');
   };
 
@@ -115,10 +120,20 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           setLoadingPerms(false);
         })
         .catch(() => setLoadingPerms(false));
+      
+      if (user.perfil === 'admin') {
+        api.get('/todas-empresas').then(res => setTodasEmpresas(res.data));
+      }
     } else {
       setLoadingPerms(false);
     }
-  }, [user.id]);
+  }, [user.id, user.perfil]);
+
+  const handleSwitchEmpresa = (id: string) => {
+    localStorage.setItem('activeEmpresaId', id);
+    setActiveEmpresaId(id);
+    window.location.reload(); // Reload to refresh all data with new empresa_id
+  };
 
   const isAdmin = user.perfil === 'admin';
   const isProfessor = user.perfil === 'professor';
@@ -174,6 +189,21 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <h1 className="text-xl font-bold tracking-tight text-slate-800">EduManager</h1>
         </div>
 
+        {isAdmin && todasEmpresas.length > 1 && (
+          <div className="mb-6 px-2">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Unidade Escolar</label>
+            <select 
+              value={activeEmpresaId}
+              onChange={(e) => handleSwitchEmpresa(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50"
+            >
+              {todasEmpresas.map(e => (
+                <option key={e.id} value={e.id}>{e.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <nav className="flex flex-col gap-2 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-12 lg:mt-0">
           {hasAccess('Painel') && <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Painel" active={location.pathname === '/dashboard'} />}
           
@@ -189,6 +219,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           {hasAccess('Financeiro') && <SidebarItem to="/financeiro" icon={DollarSign} label="Financeiro" active={location.pathname === '/financeiro'} />}
           {hasAccess('Comunicação') && <SidebarItem to="/comunicacao" icon={MessageSquare} label="Comunicação" active={location.pathname === '/comunicacao'} />}
           {hasAccess('Secretaria') && <SidebarItem to="/secretaria" icon={FileText} label="Secretaria" active={location.pathname === '/secretaria'} />}
+          {hasAccess('Transferências') && <SidebarItem to="/transferencias" icon={ArrowRightLeft} label="Transferências" active={location.pathname === '/transferencias'} />}
           {hasAccess('Acesso') && <SidebarItem to="/controle-acesso" icon={ShieldCheck} label="Acesso" active={location.pathname === '/controle-acesso'} />}
           {hasAccess('Configurações') && <SidebarItem to="/configuracoes" icon={SettingsIcon} label="Configurações" active={location.pathname === '/configuracoes'} />}
         </nav>
@@ -251,6 +282,7 @@ const Login = () => {
       } else {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
+        localStorage.setItem('activeEmpresaId', res.data.user.empresa_id.toString());
         navigate('/dashboard');
       }
     } catch (err) {
@@ -2735,6 +2767,8 @@ const Alunos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
   const [activeFormTab, setActiveFormTab] = useState('pessoal');
+  const [loading, setLoading] = useState(false);
+  const [escolaAtual, setEscolaAtual] = useState<any>(null);
   
   const [formData, setFormData] = useState<any>({
     nome: '',
@@ -2773,12 +2807,14 @@ const Alunos = () => {
   ];
 
   const fetchAlunos = async () => {
-    const [aluRes, turRes] = await Promise.all([
+    const [aluRes, turRes, escolaRes] = await Promise.all([
       api.get('/alunos'),
-      api.get('/turmas')
+      api.get('/turmas'),
+      api.get('/escola-atual')
     ]);
     setAlunos(aluRes.data);
     setTurmas(turRes.data);
+    setEscolaAtual(escolaRes.data);
   };
 
   useEffect(() => {
@@ -2855,6 +2891,112 @@ const Alunos = () => {
         alert('Erro ao excluir aluno');
       }
     }
+  };
+
+  const generateFichaMatricula = (aluno: any) => {
+    const doc = window.open('', '_blank');
+    if (!doc) return;
+    const html = `
+      <html>
+        <head>
+          <title>Ficha de Matrícula - ${aluno.nome}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+            .section { margin-bottom: 25px; }
+            .section-title { font-weight: bold; background: #f8fafc; padding: 8px 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #4f46e5; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+            .field { margin-bottom: 8px; }
+            .label { font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; display: block; }
+            .value { font-size: 14px; font-weight: 500; }
+            .footer { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; text-align: center; }
+            .sig { border-top: 1px solid #ccc; padding-top: 10px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 style="margin:0; color: #1e293b;">${escolaAtual?.nome || 'FICHA DE MATRÍCULA'}</h1>
+            <p style="margin:5px 0; color: #64748b;">Ano Letivo: ${new Date().getFullYear()}</p>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">DADOS DO ALUNO</div>
+            <div class="grid">
+              <div class="field"><span class="label">Nome</span><span class="value">${aluno.nome}</span></div>
+              <div class="field"><span class="label">CPF</span><span class="value">${aluno.cpf}</span></div>
+              <div class="field"><span class="label">RG</span><span class="value">${aluno.rg || '---'}</span></div>
+              <div class="field"><span class="label">Nascimento</span><span class="value">${new Date(aluno.data_nascimento).toLocaleDateString('pt-BR')}</span></div>
+              <div class="field"><span class="label">Turma</span><span class="value">${aluno.turma_nome || 'A definir'}</span></div>
+              <div class="field"><span class="label">E-mail</span><span class="value">${aluno.email || '---'}</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">FILIAÇÃO E RESPONSÁVEIS</div>
+            <div class="grid">
+              <div class="field"><span class="label">Mãe</span><span class="value">${aluno.nome_mae || '---'}</span></div>
+              <div class="field"><span class="label">Pai</span><span class="value">${aluno.nome_pai || '---'}</span></div>
+              <div class="field"><span class="label">Responsável Legal</span><span class="value">${aluno.responsavel_legal || '---'}</span></div>
+              <div class="field"><span class="label">Contato</span><span class="value">${aluno.whatsapp_responsavel || aluno.telefone || '---'}</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">ENDEREÇO</div>
+            <div class="field"><span class="label">Logradouro</span><span class="value">${aluno.endereco}, ${aluno.numero} - ${aluno.bairro}</span></div>
+            <div class="field"><span class="label">Cidade/UF</span><span class="value">${aluno.cidade} - ${aluno.estado} | CEP: ${aluno.cep}</span></div>
+          </div>
+
+          <div class="footer">
+            <div class="sig">Assinatura do Responsável</div>
+            <div class="sig">Secretaria Escolar</div>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    doc.document.write(html);
+    doc.document.close();
+  };
+
+  const generateDeclaracaoEscolaridade = (aluno: any) => {
+    const doc = window.open('', '_blank');
+    if (!doc) return;
+    const html = `
+      <html>
+        <head>
+          <title>Declaração de Escolaridade - ${aluno.nome}</title>
+          <style>
+            body { font-family: serif; padding: 80px; line-height: 1.8; text-align: justify; }
+            .header { text-align: center; margin-bottom: 60px; }
+            .title { font-weight: bold; text-decoration: underline; margin-bottom: 40px; display: block; text-align: center; font-size: 20px; }
+            .footer { margin-top: 100px; text-align: center; }
+            .sig { border-top: 1px solid #000; width: 300px; margin: 0 auto; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 style="margin:0;">${escolaAtual?.nome || 'INSTITUIÇÃO DE ENSINO'}</h1>
+            <p>${escolaAtual?.endereco || ''}</p>
+          </div>
+          
+          <span class="title">DECLARAÇÃO DE ESCOLARIDADE</span>
+          
+          <p>Declaramos para os devidos fins que o(a) aluno(a) <b>${aluno.nome}</b>, portador(a) do CPF nº <b>${aluno.cpf}</b>, encontra-se regularmente matriculado(a) nesta unidade de ensino, cursando a turma <b>${aluno.turma_nome || '---'}</b> no ano letivo de ${new Date().getFullYear()}.</p>
+          
+          <p>Por ser verdade, firmamos a presente declaração.</p>
+          
+          <p style="text-align: right; margin-top: 50px;">${aluno.cidade || 'Local'}, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+
+          <div class="footer">
+            <div class="sig">Secretaria Escolar / Direção</div>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    doc.document.write(html);
+    doc.document.close();
   };
 
   const filteredAlunos = alunos.filter(a => 
@@ -2938,9 +3080,12 @@ const Alunos = () => {
                   </td>
                   <td className="px-8 py-6 text-right">
                       <div className="flex justify-end gap-3">
-                        <Link to={`/secretaria?alunoId=${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Gerar Documentos">
+                        <button onClick={() => generateFichaMatricula(aluno)} className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-all" title="Ficha de Matrícula">
+                          <FileCheck size={18} />
+                        </button>
+                        <button onClick={() => generateDeclaracaoEscolaridade(aluno)} className="p-2 rounded-xl text-amber-600 hover:bg-amber-50 transition-all" title="Declaração de Escolaridade">
                           <FileText size={18} />
-                        </Link>
+                        </button>
                         <Link to={`/boletim/${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Ver Boletim">
                           <BookOpen size={18} />
                         </Link>
@@ -3588,16 +3733,19 @@ const Funcionarios = () => {
   const [formData, setFormData] = useState<any>({});
   const [editingItem, setEditingItem] = useState<any>(null);
   const [vinculos, setVinculos] = useState<any[]>([]);
+  const [escolaAtual, setEscolaAtual] = useState<any>(null);
 
   const fetchData = async () => {
-    const [fRes, dRes, tRes] = await Promise.all([
+    const [fRes, dRes, tRes, eRes] = await Promise.all([
       api.get('/funcionarios'),
       api.get('/disciplinas'),
-      api.get('/turmas')
+      api.get('/turmas'),
+      api.get('/escola-atual')
     ]);
     setFuncionarios(fRes.data);
     setDisciplinas(dRes.data);
     setTurmas(tRes.data);
+    setEscolaAtual(eRes.data);
   };
 
   useEffect(() => {
@@ -3616,7 +3764,7 @@ const Funcionarios = () => {
         funcionarioId = res.data.id;
       }
 
-      if (formData.cargo === 'Professor(a)' || formData.cargo === 'Professor') {
+      if (formData.cargo?.includes('Professor')) {
         await api.post('/professor-vinculos', {
           funcionario_id: funcionarioId,
           vinculos: vinculos
@@ -3662,6 +3810,48 @@ const Funcionarios = () => {
         alert('Erro ao excluir funcionário');
       }
     }
+  };
+
+  const generateDeclaracaoVinculo = (f: any) => {
+    const doc = window.open('', '_blank');
+    if (!doc) return;
+    const html = `
+      <html>
+        <head>
+          <title>Declaração de Vínculo - ${f.nome}</title>
+          <style>
+            body { font-family: serif; padding: 80px; line-height: 1.8; text-align: justify; }
+            .header { text-align: center; margin-bottom: 60px; }
+            .title { font-weight: bold; text-decoration: underline; margin-bottom: 40px; display: block; text-align: center; font-size: 20px; }
+            .footer { margin-top: 100px; text-align: center; }
+            .sig { border-top: 1px solid #000; width: 300px; margin: 0 auto; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 style="margin:0;">${escolaAtual?.nome || 'INSTITUIÇÃO DE ENSINO'}</h1>
+            <p>${escolaAtual?.endereco || ''}</p>
+          </div>
+          
+          <span class="title">DECLARAÇÃO DE VÍNCULO EMPREGATÍCIO</span>
+          
+          <p>Declaramos para os devidos fins que o(a) Sr(a). <b>${f.nome}</b>, portador(a) do CPF nº <b>${f.cpf}</b>, possui vínculo profissional com esta instituição de ensino, exercendo atualmente o cargo de <b>${f.cargo}</b>.</p>
+          
+          <p>O referido colaborador encontra-se em pleno exercício de suas atividades profissionais desde ${f.data_admissao ? new Date(f.data_admissao).toLocaleDateString('pt-BR') : 'a data de sua admissão'}.</p>
+          
+          <p>Por ser verdade, firmamos a presente declaração.</p>
+          
+          <p style="text-align: right; margin-top: 50px;">${f.cidade || 'Local'}, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+
+          <div class="footer">
+            <div class="sig">Direção / Recursos Humanos</div>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    doc.document.write(html);
+    doc.document.close();
   };
 
   return (
@@ -3719,28 +3909,40 @@ const Funcionarios = () => {
                   <p className="text-xs text-slate-400">{f.telefone}</p>
                 </td>
                 <td className="px-8 py-6 text-right">
-                  <div className="flex justify-end gap-3">
+                    <div className="flex justify-end gap-3">
+                    <button 
+                      onClick={() => generateDeclaracaoVinculo(f)}
+                      className="p-2 rounded-xl text-amber-600 hover:bg-amber-50 transition-all"
+                      title="Gerar Declaração de Vínculo"
+                    >
+                      <FileText size={18} />
+                    </button>
                     <button 
                       onClick={async () => { 
                         setEditingItem(f); 
                         setFormData(f); 
-                        if (f.cargo === 'Professor(a)' || f.cargo === 'Professor') {
-                          const vRes = await api.get(`/professor-vinculos/${f.id}`);
-                          setVinculos(vRes.data);
-                        } else {
-                          setVinculos([]);
-                        }
+                        setVinculos([]); 
                         setShowModal(true); 
+                        if (f.cargo?.includes('Professor')) {
+                          try {
+                            const vRes = await api.get(`/professor-vinculos/${f.id}`);
+                            setVinculos(vRes.data);
+                          } catch (err) {
+                            console.error('Erro ao buscar vínculos:', err);
+                          }
+                        }
                       }}
-                      className="text-indigo-600 font-bold text-sm hover:underline"
+                      className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all"
+                      title="Editar Funcionário"
                     >
-                      Editar
+                      <SettingsIcon size={18} />
                     </button>
                     <button 
                       onClick={() => handleDelete(f.id)}
-                      className="text-red-600 font-bold text-sm hover:underline"
+                      className="p-2 rounded-xl text-red-600 hover:bg-red-50 transition-all"
+                      title="Excluir Funcionário"
                     >
-                      Excluir
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </td>
@@ -3837,7 +4039,7 @@ const Funcionarios = () => {
                     ))}
                   </select>
                 </div>
-                {formData.cargo === 'Professor(a)' && (
+                {formData.cargo?.includes('Professor') && (
                   <div className="col-span-2 space-y-4 border-t border-slate-100 pt-6">
                     <div className="flex justify-between items-center">
                       <h3 className="font-bold text-slate-800">Vínculos de Disciplinas e Turmas</h3>
@@ -4148,9 +4350,9 @@ const ControleAcesso = () => {
           nome: selectedRecord.nome,
           email: userEmail,
           senha: tempPassword,
-          perfil: selectedRecord.tipo === 'aluno' ? 'aluno' : (['Professor', 'Professor(a)'].includes(selectedRecord.cargo) ? 'professor' : 'funcionario'),
+          perfil: selectedRecord.tipo === 'aluno' ? 'aluno' : (selectedRecord.cargo?.includes('Professor') ? 'professor' : 'funcionario'),
           aluno_id: selectedRecord.tipo === 'aluno' ? selectedRecord.id : null,
-          professor_id: selectedRecord.tipo === 'funcionario' && ['Professor', 'Professor(a)'].includes(selectedRecord.cargo) ? selectedRecord.id : null,
+          professor_id: selectedRecord.tipo === 'funcionario' && selectedRecord.cargo?.includes('Professor') ? selectedRecord.id : null,
           funcionario_id: selectedRecord.tipo === 'funcionario' ? selectedRecord.id : null
         });
         userId = res.data.id;
@@ -5496,6 +5698,424 @@ const Boletim = () => {
   );
 };
 
+const Transferencias = () => {
+  const [transferencias, setTransferencias] = useState<any[]>([]);
+  const [empresasRede, setEmpresasRede] = useState<any[]>([]);
+  const [alunos, setAlunos] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [showRequisitarModal, setShowRequisitarModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [escolaAtual, setEscolaAtual] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    aluno_id: '',
+    escola_destino_id: '',
+    tipo: 'interna',
+    escola_externa_nome: '',
+    motivo: '',
+    observacoes: ''
+  });
+  const [requisitarData, setRequisitarData] = useState({
+    aluno_cpf: '',
+    escola_origem_id: '',
+    motivo: '',
+    observacoes: ''
+  });
+
+  const fetchData = async () => {
+    try {
+      const [transRes, redeRes, alunosRes, escolaRes] = await Promise.all([
+        api.get('/transferencias'),
+        api.get('/empresas-rede'),
+        api.get('/alunos'),
+        api.get('/escola-atual')
+      ]);
+      setTransferencias(transRes.data);
+      setEmpresasRede(redeRes.data);
+      setAlunos(alunosRes.data);
+      setEscolaAtual(escolaRes.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleCreateTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/transferencias', formData);
+      setShowModal(false);
+      fetchData();
+      alert('Solicitação de transferência enviada!');
+    } catch (err) {
+      alert('Erro ao criar transferência');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequisitarTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/transferencias/requisitar', requisitarData);
+      setShowRequisitarModal(false);
+      fetchData();
+      alert('Requisição de transferência enviada!');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao requisitar transferência');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    const obs = prompt('Observações (opcional):');
+    try {
+      await api.post(`/transferencias/${id}/status`, { status, observacoes: obs });
+      fetchData();
+      alert(`Transferência ${status === 'aprovada' ? 'aprovada' : 'rejeitada'} com sucesso!`);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao atualizar status');
+    }
+  };
+
+  const generateDeclaration = (t: any) => {
+    const doc = window.open('', '_blank');
+    if (!doc) return;
+
+    const html = `
+      <html>
+        <head>
+          <title>Declaração de Transferência</title>
+          <style>
+            body { font-family: sans-serif; padding: 50px; line-height: 1.6; }
+            .header { text-align: center; margin-bottom: 50px; }
+            .content { text-align: justify; }
+            .footer { margin-top: 100px; text-align: center; }
+            .signature { border-top: 1px solid #000; width: 300px; margin: 0 auto; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${escolaAtual?.nome || 'ESCOLA'}</h1>
+            <p>${escolaAtual?.endereco || ''} - Tel: ${escolaAtual?.telefone || ''}</p>
+            <hr/>
+            <h2>DECLARAÇÃO DE TRANSFERÊNCIA</h2>
+          </div>
+          <div class="content">
+            <p>Declaramos para os devidos fins que o(a) aluno(a) <b>${t.aluno_nome}</b>, está em processo de transferência desta unidade escolar para a instituição <b>${t.tipo === 'interna' ? t.escola_destino_nome : t.escola_externa_nome}</b>.</p>
+            <p>O referido aluno encontra-se com sua documentação regularizada e apto para prosseguir seus estudos na instituição de destino.</p>
+            <p>Motivo da transferência: ${t.motivo || 'Não informado'}</p>
+            <br/>
+            <p>Local e data: ${new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
+          <div class="footer">
+            <div class="signature">
+              <p>Direção / Secretaria Escolar</p>
+              <p>${escolaAtual?.nome || ''}</p>
+            </div>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    doc.document.write(html);
+    doc.document.close();
+  };
+
+  return (
+    <div className="space-y-10">
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Transferências</h1>
+          <p className="text-slate-500 mt-2">Gerencie a movimentação de alunos entre escolas da rede e externas.</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setShowRequisitarModal(true)}
+            className="bg-white text-indigo-600 border border-indigo-200 px-6 py-3 rounded-2xl font-bold shadow-sm hover:bg-indigo-50 transition-all flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Requisitar Aluno
+          </button>
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
+          >
+            <ArrowRightLeft size={20} />
+            Nova Transferência
+          </button>
+        </div>
+      </header>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Aluno</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Origem</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Destino</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Data</th>
+                <th className="px-8 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {transferencias.map((t) => (
+                <tr key={t.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-8 py-6">
+                    <span className="font-bold text-slate-800">{t.aluno_nome}</span>
+                  </td>
+                  <td className="px-8 py-6 text-sm text-slate-600">{t.escola_origem_nome}</td>
+                  <td className="px-8 py-6 text-sm text-slate-600">
+                    {t.tipo === 'interna' ? t.escola_destino_nome : t.escola_externa_nome}
+                    {t.tipo === 'externa' && <span className="ml-2 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 uppercase">Externa</span>}
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className={cn(
+                      "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                      t.status === 'pendente' ? "bg-amber-100 text-amber-700" :
+                      t.status === 'aprovada' ? "bg-emerald-100 text-emerald-700" :
+                      t.status === 'rejeitada' ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-700"
+                    )}>
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 text-sm text-slate-500">
+                    {new Date(t.data_solicitacao).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <div className="flex justify-end gap-2">
+                      {t.status === 'pendente' && t.escola_origem_id === escolaAtual?.id && (
+                        <>
+                          <button 
+                            onClick={() => handleUpdateStatus(t.id, 'aprovada')}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Aprovar Saída"
+                          >
+                            <Check size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleUpdateStatus(t.id, 'rejeitada')}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Rejeitar Saída"
+                          >
+                            <X size={18} />
+                          </button>
+                        </>
+                      )}
+                      {t.status === 'aprovada' && (
+                        <button 
+                          onClick={() => generateDeclaration(t)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                          title="Gerar Declaração"
+                        >
+                          <FileCheck size={18} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {transferencias.length === 0 && (
+            <div className="p-20 text-center">
+              <div className="bg-slate-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ArrowRightLeft className="text-slate-300" size={32} />
+              </div>
+              <p className="text-slate-400 font-medium">Nenhuma transferência registrada.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Nova Transferência (Saída) */}
+      <AnimatePresence>
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Nova Transferência</h2>
+                  <p className="text-slate-500 text-sm">Solicite a saída de um aluno da escola.</p>
+                </div>
+                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm">
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={handleCreateTransfer} className="p-8 space-y-6">
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Aluno</label>
+                    <select 
+                      value={formData.aluno_id}
+                      onChange={(e) => setFormData({...formData, aluno_id: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      required
+                    >
+                      <option value="">Selecione o aluno</option>
+                      {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Transferência</label>
+                    <div className="flex gap-4">
+                      <label className="flex-1 flex items-center gap-2 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                        <input type="radio" name="tipo" value="interna" checked={formData.tipo === 'interna'} onChange={() => setFormData({...formData, tipo: 'interna'})} />
+                        <span className="text-sm font-medium">Rede Interna</span>
+                      </label>
+                      <label className="flex-1 flex items-center gap-2 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                        <input type="radio" name="tipo" value="externa" checked={formData.tipo === 'externa'} onChange={() => setFormData({...formData, tipo: 'externa'})} />
+                        <span className="text-sm font-medium">Escola Externa</span>
+                      </label>
+                    </div>
+                  </div>
+                  {formData.tipo === 'interna' ? (
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Escola de Destino</label>
+                      <select 
+                        value={formData.escola_destino_id}
+                        onChange={(e) => setFormData({...formData, escola_destino_id: e.target.value})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        required
+                      >
+                        <option value="">Selecione a escola</option>
+                        {empresasRede.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Nome da Escola Externa</label>
+                      <input 
+                        type="text"
+                        value={formData.escola_externa_nome}
+                        onChange={(e) => setFormData({...formData, escola_externa_nome: e.target.value})}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Ex: Colégio Estadual..."
+                        required
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Motivo</label>
+                    <input 
+                      type="text"
+                      value={formData.motivo}
+                      onChange={(e) => setFormData({...formData, motivo: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      placeholder="Ex: Mudança de endereço"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={loading} className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50">
+                    {loading ? 'Enviando...' : 'Solicitar Transferência'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Requisitar Aluno (Entrada) */}
+      <AnimatePresence>
+        {showRequisitarModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowRequisitarModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Requisitar Aluno</h2>
+                  <p className="text-slate-500 text-sm">Solicite a vinda de um aluno de outra escola da rede.</p>
+                </div>
+                <button onClick={() => setShowRequisitarModal(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm">
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={handleRequisitarTransfer} className="p-8 space-y-6">
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">CPF do Aluno</label>
+                    <input 
+                      type="text"
+                      value={requisitarData.aluno_cpf}
+                      onChange={(e) => setRequisitarData({...requisitarData, aluno_cpf: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      placeholder="000.000.000-00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Escola de Origem</label>
+                    <select 
+                      value={requisitarData.escola_origem_id}
+                      onChange={(e) => setRequisitarData({...requisitarData, escola_origem_id: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      required
+                    >
+                      <option value="">Selecione a escola</option>
+                      {empresasRede.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Motivo da Requisição</label>
+                    <input 
+                      type="text"
+                      value={requisitarData.motivo}
+                      onChange={(e) => setRequisitarData({...requisitarData, motivo: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      placeholder="Ex: Solicitação dos pais"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setShowRequisitarModal(false)} className="flex-1 px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={loading} className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50">
+                    {loading ? 'Enviando...' : 'Requisitar Aluno'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // --- App Root ---
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -5524,6 +6144,7 @@ export default function App() {
         <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
         <Route path="/comunicacao" element={<ProtectedRoute><Communication /></ProtectedRoute>} />
         <Route path="/secretaria" element={<ProtectedRoute><DigitalSecretary /></ProtectedRoute>} />
+        <Route path="/transferencias" element={<ProtectedRoute><Transferencias /></ProtectedRoute>} />
         <Route path="/controle-acesso" element={<ProtectedRoute><ControleAcesso /></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/boletim/:alunoId" element={<ProtectedRoute><Boletim /></ProtectedRoute>} />

@@ -77,7 +77,14 @@ const auth = async (c: any, next: any) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    
+    // Support switching schools for admins
+    const requestedEmpresaId = c.req.header('x-empresa-id');
+    if (requestedEmpresaId && decoded.perfil === 'admin') {
+      decoded.empresa_id = parseInt(requestedEmpresaId);
+    }
+    
     c.set('user', decoded);
     await next();
   } catch (err) {
@@ -174,6 +181,19 @@ CREATE TABLE IF NOT EXISTS alunos (
   posicao_sala INTEGER,
   fileira INTEGER,
   assento INTEGER
+);
+CREATE TABLE IF NOT EXISTS transferencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  aluno_id INTEGER,
+  escola_origem_id INTEGER,
+  escola_destino_id INTEGER,
+  tipo TEXT, -- 'interna' ou 'externa'
+  escola_externa_nome TEXT,
+  motivo TEXT,
+  status TEXT DEFAULT 'pendente', -- 'pendente', 'aprovada', 'rejeitada', 'concluida'
+  data_solicitacao TEXT,
+  data_aprovacao TEXT,
+  observacoes TEXT
 );
 CREATE TABLE IF NOT EXISTS funcionarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -661,6 +681,110 @@ app.get('/api/health', async (c) => {
         telefone, email, foto, cargo, data_admissao, disciplina_id, turma_id, c.req.param('id'), c.get('user').empresa_id
       );
       return c.json({ success: true });
+    });
+
+    // Transfer Endpoints
+    app.get('/api/empresas-rede', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const rows = await db.prepare("SELECT id, nome FROM empresas WHERE id != ?").all(c.get('user').empresa_id);
+      return c.json(rows);
+    });
+
+    app.get('/api/todas-empresas', auth, async (c) => {
+      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
+      const db = new DBWrapper(c.env.DB);
+      const rows = await db.prepare("SELECT id, nome FROM empresas").all();
+      return c.json(rows);
+    });
+
+    app.get('/api/transferencias', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const empresa_id = c.get('user').empresa_id;
+      
+      const rows = await db.prepare(`
+        SELECT t.*, a.nome as aluno_nome, e_origem.nome as escola_origem_nome, e_destino.nome as escola_destino_nome
+        FROM transferencias t
+        JOIN alunos a ON t.aluno_id = a.id
+        LEFT JOIN empresas e_origem ON t.escola_origem_id = e_origem.id
+        LEFT JOIN empresas e_destino ON t.escola_destino_id = e_destino.id
+        WHERE t.escola_origem_id = ? OR t.escola_destino_id = ?
+        ORDER BY t.data_solicitacao DESC
+      `).all(empresa_id, empresa_id);
+      
+      return c.json(rows);
+    });
+
+    app.post('/api/transferencias', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const data = await c.req.json();
+      const { aluno_id, escola_destino_id, tipo, escola_externa_nome, motivo, observacoes } = data;
+      const escola_origem_id = c.get('user').empresa_id;
+      const data_solicitacao = new Date().toISOString();
+
+      const res = await db.prepare(`
+        INSERT INTO transferencias (aluno_id, escola_origem_id, escola_destino_id, tipo, escola_externa_nome, motivo, status, data_solicitacao, observacoes)
+        VALUES (?, ?, ?, ?, ?, ?, 'pendente', ?, ?)
+      `).run(aluno_id, escola_origem_id, escola_destino_id, tipo, escola_externa_nome, motivo, data_solicitacao, observacoes);
+
+      return c.json({ id: res.lastInsertRowid });
+    });
+
+    app.post('/api/transferencias/requisitar', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const data = await c.req.json();
+      const { aluno_cpf, escola_origem_id, motivo, observacoes } = data;
+      const escola_destino_id = c.get('user').empresa_id;
+      const data_solicitacao = new Date().toISOString();
+
+      const aluno = await db.prepare("SELECT id FROM alunos WHERE cpf = ? AND empresa_id = ?").get(aluno_cpf.replace(/\D/g, ''), escola_origem_id);
+      
+      if (!aluno) {
+        return c.json({ error: 'Aluno não encontrado na escola de origem com este CPF.' }, 404);
+      }
+
+      const res = await db.prepare(`
+        INSERT INTO transferencias (aluno_id, escola_origem_id, escola_destino_id, tipo, motivo, status, data_solicitacao, observacoes)
+        VALUES (?, ?, ?, 'interna', ?, 'pendente', ?, ?)
+      `).run(aluno.id, escola_origem_id, escola_destino_id, motivo, data_solicitacao, observacoes);
+
+      return c.json({ id: res.lastInsertRowid });
+    });
+
+    app.post('/api/transferencias/:id/status', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const { status, observacoes } = await c.req.json();
+      const id = c.req.param('id');
+      const empresa_id = c.get('user').empresa_id;
+      const data_aprovacao = new Date().toISOString();
+
+      const transfer = await db.prepare("SELECT * FROM transferencias WHERE id = ?").get(id);
+      if (!transfer) return c.json({ error: 'Transferência não encontrada' }, 404);
+
+      if (status === 'aprovada') {
+        if (transfer.escola_origem_id !== empresa_id) {
+          return c.json({ error: 'Apenas a escola de origem pode aprovar a saída do aluno.' }, 403);
+        }
+
+        if (transfer.tipo === 'interna' && transfer.escola_destino_id) {
+          await db.prepare("UPDATE alunos SET empresa_id = ?, turma_id = NULL WHERE id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
+          await db.prepare("UPDATE usuarios SET empresa_id = ?, turma_id = NULL WHERE aluno_id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
+        } else if (transfer.tipo === 'externa') {
+          await db.prepare("UPDATE alunos SET status = 'transferido' WHERE id = ?").run(transfer.aluno_id);
+        }
+      }
+
+      await db.prepare(`
+        UPDATE transferencias SET status = ?, data_aprovacao = ?, observacoes = COALESCE(?, observacoes)
+        WHERE id = ?
+      `).run(status, data_aprovacao, observacoes, id);
+
+      return c.json({ success: true });
+    });
+
+    app.get('/api/escola-atual', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const row = await db.prepare("SELECT * FROM empresas WHERE id = ?").get(c.get('user').empresa_id);
+      return c.json(row);
     });
 
     app.get('/api/professor-vinculos/:funcionarioId', auth, async (c) => {

@@ -6,8 +6,12 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  const empresaId = localStorage.getItem('activeEmpresaId');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (empresaId) {
+    config.headers['x-empresa-id'] = empresaId;
   }
   return config;
 });
