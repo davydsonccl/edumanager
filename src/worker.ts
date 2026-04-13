@@ -730,11 +730,19 @@ app.get('/api/health', async (c) => {
       if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const db = new DBWrapper(c.env.DB);
       try {
-        const { nome, cnpj, endereco, telefone, email } = await c.req.json();
+        const { nome, cnpj, endereco, telefone, email, admin_email, admin_senha } = await c.req.json();
         if (!nome) return c.json({ error: 'Nome da escola é obrigatório' }, 400);
         
         const res = await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email) VALUES (?, ?, ?, ?, ?)").run(nome, cnpj, endereco, telefone, email);
-        return c.json({ id: res.lastInsertRowid });
+        const empresaId = res.lastInsertRowid;
+
+        // Create admin user for this school if credentials provided
+        if (admin_email && admin_senha) {
+          const hash = bcrypt.hashSync(admin_senha, 10);
+          await db.prepare("INSERT INTO usuarios (empresa_id, nome, email, senha, perfil, super_admin) VALUES (?, ?, ?, ?, ?, ?)").run(empresaId, `Admin ${nome}`, admin_email, hash, 'admin', 0);
+        }
+        
+        return c.json({ id: empresaId });
       } catch (err: any) {
         console.error('Erro ao cadastrar empresa:', err);
         return c.json({ error: err.message }, 500);

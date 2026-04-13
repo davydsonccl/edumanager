@@ -6342,6 +6342,36 @@ const Escolas = () => {
                     <label className="block text-sm font-bold text-slate-700 mb-2">E-mail</label>
                     <input type="email" value={formData.email || ''} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </div>
+
+                  {!formData.id && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 mb-4">Credenciais do Administrador da Unidade</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">E-mail de Login</label>
+                          <input 
+                            type="email" 
+                            value={formData.admin_email || ''} 
+                            onChange={(e) => setFormData({...formData, admin_email: e.target.value})} 
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            placeholder="admin@escola.com"
+                            required={!formData.id}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Senha Inicial</label>
+                          <input 
+                            type="password" 
+                            value={formData.admin_senha || ''} 
+                            onChange={(e) => setFormData({...formData, admin_senha: e.target.value})} 
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            placeholder="••••••••"
+                            required={!formData.id}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-4 border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all">Cancelar</button>
