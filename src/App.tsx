@@ -2008,28 +2008,32 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                     <p><strong>Ano Letivo:</strong> {new Date().getFullYear()}</p>
                     <p><strong>Status:</strong> {aluno.status || 'Ativo'}</p>
                   </div>
-                  <table className="w-full border-collapse border border-slate-300">
-                    <thead>
-                      <tr className="bg-slate-100">
-                        <th className="border border-slate-300 p-2 text-left">Disciplina</th>
-                        <th className="border border-slate-300 p-2 text-center">Média Final</th>
-                        <th className="border border-slate-300 p-2 text-center">Situação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {boletim.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="border border-slate-300 p-2">{item.disciplina}</td>
-                          <td className="border border-slate-300 p-2 text-center font-mono">{(item.media || 0).toFixed(1)}</td>
-                          <td className="border border-slate-300 p-2 text-center">
-                            <span className={item.media >= 6 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                              {item.media >= 6 ? 'APROVADO' : 'REPROVADO'}
-                            </span>
-                          </td>
+                    <table className="w-full border-collapse border border-slate-300">
+                      <thead>
+                        <tr className="bg-slate-100">
+                          <th className="border border-slate-300 p-2 text-left">Disciplina</th>
+                          <th className="border border-slate-300 p-2 text-center">Bimestre</th>
+                          <th className="border border-slate-300 p-2 text-center">Nota / Conceito</th>
+                          <th className="border border-slate-300 p-2 text-center">Situação</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {boletim.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="border border-slate-300 p-2">{item.disciplina}</td>
+                            <td className="border border-slate-300 p-2 text-center">{item.bimestre}º</td>
+                            <td className="border border-slate-300 p-2 text-center font-mono font-bold">
+                              {item.tipo_avaliacao === 'conceito' ? item.conceito : (item.valor !== null ? item.valor.toFixed(1) : '---')}
+                            </td>
+                            <td className="border border-slate-300 p-2 text-center">
+                              <span className={(item.valor >= 6 || item.conceito === 'A' || item.conceito === 'B' || item.conceito === 'P') ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                                {(item.valor >= 6 || item.conceito === 'A' || item.conceito === 'B' || item.conceito === 'P') ? 'APROVADO' : 'REPROVADO'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   <div className="pt-12 flex justify-around">
                     <div className="border-t border-slate-800 w-48 pt-2 text-center">
                       <p className="text-[10px] font-bold uppercase">{secretario || empresa.secretario || 'Secretaria'}</p>
@@ -2159,7 +2163,8 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                       <tr className="bg-slate-100">
                         <th className="border border-slate-300 p-2 text-left">Disciplina</th>
                         <th className="border border-slate-300 p-2 text-center">Carga Horária</th>
-                        <th className="border border-slate-300 p-2 text-center">Média</th>
+                        <th className="border border-slate-300 p-2 text-center">Bimestre</th>
+                        <th className="border border-slate-300 p-2 text-center">Nota / Conceito</th>
                         <th className="border border-slate-300 p-2 text-center">Frequência</th>
                         <th className="border border-slate-300 p-2 text-center">Resultado</th>
                       </tr>
@@ -2168,10 +2173,15 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                       {boletim.map((item, idx) => (
                         <tr key={idx}>
                           <td className="border border-slate-300 p-2">{item.disciplina}</td>
-                          <td className="border border-slate-300 p-2 text-center">80h</td>
-                          <td className="border border-slate-300 p-2 text-center">{(item.media || 0).toFixed(1)}</td>
+                          <td className="border border-slate-300 p-2 text-center">{item.carga_horaria || '80'}h</td>
+                          <td className="border border-slate-300 p-2 text-center">{item.bimestre}º</td>
+                          <td className="border border-slate-300 p-2 text-center font-bold">
+                            {item.tipo_avaliacao === 'conceito' ? item.conceito : (item.valor !== null ? item.valor.toFixed(1) : '---')}
+                          </td>
                           <td className="border border-slate-300 p-2 text-center">95%</td>
-                          <td className="border border-slate-300 p-2 text-center">{item.media >= 6 ? 'APROVADO' : 'REPROVADO'}</td>
+                          <td className="border border-slate-300 p-2 text-center font-bold">
+                            {(item.valor >= 6 || item.conceito === 'A' || item.conceito === 'B' || item.conceito === 'P') ? 'APROVADO' : 'REPROVADO'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2201,6 +2211,15 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
 
       <style>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 0;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -2208,13 +2227,21 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
             visibility: visible !important;
           }
           #printable-document {
-            position: absolute !important;
+            position: fixed !important;
             left: 0 !important;
             top: 0 !important;
-            width: 100% !important;
+            width: 210mm !important;
+            height: 297mm !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 20mm !important;
             box-shadow: none !important;
+            border: none !important;
+            background: white !important;
+            z-index: 9999 !important;
+          }
+          /* Hide scrollbars and other UI elements during print */
+          .no-print {
+            display: none !important;
           }
         }
       `}</style>
@@ -2232,6 +2259,14 @@ const DigitalSecretary = () => {
   const [empresa, setEmpresa] = useState<any>({});
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('documentos');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredAlunos = useMemo(() => {
+    return alunos.filter(a => 
+      a.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.cpf && a.cpf.includes(searchTerm))
+    );
+  }, [alunos, searchTerm]);
 
   const fetchData = async () => {
     const [aluRes, empRes, solRes] = await Promise.all([
@@ -2366,16 +2401,31 @@ const DigitalSecretary = () => {
       {activeTab === 'gerador' && (
         <>
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 mb-8">
-            <label className="block text-sm font-bold text-slate-700 mb-4">Selecione o Aluno para emissão:</label>
-            <div className="flex gap-4">
-              <select 
-                value={selectedAlunoId}
-                onChange={(e) => setSelectedAlunoId(e.target.value)}
-                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-              >
-                <option value="">Selecione um aluno...</option>
-                {alunos.map(a => <option key={a.id} value={a.id}>{a.nome} - {a.cpf}</option>)}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Buscar Aluno:</label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text"
+                    placeholder="Nome ou CPF..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Selecione o Aluno:</label>
+                <select 
+                  value={selectedAlunoId}
+                  onChange={(e) => setSelectedAlunoId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="">Selecione um aluno...</option>
+                  {filteredAlunos.map(a => <option key={a.id} value={a.id}>{a.nome} - {a.cpf}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -3537,6 +3587,7 @@ const Funcionarios = () => {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [vinculos, setVinculos] = useState<any[]>([]);
 
   const fetchData = async () => {
     const [fRes, dRes, tRes] = await Promise.all([
@@ -3557,11 +3608,21 @@ const Funcionarios = () => {
     e.preventDefault();
     try {
       console.log('Salvando funcionário:', formData);
+      let funcionarioId = editingItem?.id;
       if (editingItem) {
         await api.post(`/funcionarios/${editingItem.id}`, formData);
       } else {
-        await api.post('/funcionarios', formData);
+        const res = await api.post('/funcionarios', formData);
+        funcionarioId = res.data.id;
       }
+
+      if (formData.cargo === 'Professor(a)' || formData.cargo === 'Professor') {
+        await api.post('/professor-vinculos', {
+          funcionario_id: funcionarioId,
+          vinculos: vinculos
+        });
+      }
+
       setShowModal(false);
       setEditingItem(null);
       setFormData({});
@@ -3655,7 +3716,17 @@ const Funcionarios = () => {
                 <td className="px-8 py-6 text-right">
                   <div className="flex justify-end gap-3">
                     <button 
-                      onClick={() => { setEditingItem(f); setFormData(f); setShowModal(true); }}
+                      onClick={async () => { 
+                        setEditingItem(f); 
+                        setFormData(f); 
+                        if (f.cargo === 'Professor(a)' || f.cargo === 'Professor') {
+                          const vRes = await api.get(`/professor-vinculos/${f.id}`);
+                          setVinculos(vRes.data);
+                        } else {
+                          setVinculos([]);
+                        }
+                        setShowModal(true); 
+                      }}
                       className="text-indigo-600 font-bold text-sm hover:underline"
                     >
                       Editar
@@ -3762,36 +3833,69 @@ const Funcionarios = () => {
                   </select>
                 </div>
                 {formData.cargo === 'Professor(a)' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Disciplina</label>
-                      <select
-                        value={formData.disciplina_id || ''}
-                        onChange={(e) => setFormData({ ...formData, disciplina_id: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                        required
+                  <div className="col-span-2 space-y-4 border-t border-slate-100 pt-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-bold text-slate-800">Vínculos de Disciplinas e Turmas</h3>
+                      <button 
+                        type="button"
+                        onClick={() => setVinculos([...vinculos, { disciplina_id: '', turma_id: '' }])}
+                        className="text-indigo-600 text-xs font-bold hover:underline flex items-center gap-1"
                       >
-                        <option value="">Selecione a disciplina...</option>
-                        {disciplinas.map(d => (
-                          <option key={d.id} value={d.id}>{d.nome}</option>
-                        ))}
-                      </select>
+                        <Plus size={14} /> Adicionar Vínculo
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Turma/Sala</label>
-                      <select
-                        value={formData.turma_id || ''}
-                        onChange={(e) => setFormData({ ...formData, turma_id: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                        required
-                      >
-                        <option value="">Selecione a turma...</option>
-                        {turmas.map(t => (
-                          <option key={t.id} value={t.id}>{t.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
+                    
+                    {vinculos.map((v, idx) => (
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl relative">
+                        <button 
+                          type="button"
+                          onClick={() => setVinculos(vinculos.filter((_, i) => i !== idx))}
+                          className="absolute -top-2 -right-2 p-1 bg-white border border-slate-200 rounded-full text-red-500 hover:bg-red-50"
+                        >
+                          <X size={14} />
+                        </button>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Disciplina</label>
+                          <select
+                            value={v.disciplina_id}
+                            onChange={(e) => {
+                              const newVinculos = [...vinculos];
+                              newVinculos[idx].disciplina_id = e.target.value;
+                              setVinculos(newVinculos);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
+                            required
+                          >
+                            <option value="">Selecione...</option>
+                            {disciplinas.map(d => (
+                              <option key={d.id} value={d.id}>{d.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Turma/Sala</label>
+                          <select
+                            value={v.turma_id}
+                            onChange={(e) => {
+                              const newVinculos = [...vinculos];
+                              newVinculos[idx].turma_id = e.target.value;
+                              setVinculos(newVinculos);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
+                            required
+                          >
+                            <option value="">Selecione...</option>
+                            {turmas.map(t => (
+                              <option key={t.id} value={t.id}>{t.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                    {vinculos.length === 0 && (
+                      <p className="text-center text-slate-400 text-xs italic py-4">Nenhum vínculo adicionado.</p>
+                    )}
+                  </div>
                 )}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Data de Admissão</label>
@@ -3924,6 +4028,7 @@ const ControleAcesso = () => {
   const combinedList = useMemo(() => {
     const list: any[] = [];
     
+    // Add all students
     alunos.forEach(a => {
       const user = usuarios.find(u => u.aluno_id === a.id);
       list.push({
@@ -3936,6 +4041,7 @@ const ControleAcesso = () => {
       });
     });
     
+    // Add all employees
     funcionarios.forEach(f => {
       const user = usuarios.find(u => u.funcionario_id === f.id);
       list.push({
@@ -3947,6 +4053,24 @@ const ControleAcesso = () => {
         usuario: user,
         isNew: !user
       });
+    });
+
+    // Add users that are not linked to students or employees (like the main Admin)
+    usuarios.forEach(u => {
+      if (!u.aluno_id && !u.funcionario_id) {
+        // Check if already in list (shouldn't be, but just in case)
+        if (!list.find(item => item.usuario?.id === u.id)) {
+          list.push({
+            id: u.id,
+            nome: u.nome,
+            tipo: 'usuario',
+            email: u.email,
+            cargo: u.perfil === 'admin' ? 'Administrador' : 'Usuário do Sistema',
+            usuario: u,
+            isNew: false
+          });
+        }
+      }
     });
     
     return list.filter(item => 
@@ -4446,6 +4570,10 @@ const ProfessorPortal = () => {
   const [activeTab, setActiveTab] = useState('lancamento');
   const [historicoNotas, setHistoricoNotas] = useState<any[]>([]);
   const [historicoFreq, setHistoricoFreq] = useState<any[]>([]);
+  const [professorVinculos, setProfessorVinculos] = useState<any[]>([]);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = user.perfil === 'admin';
+  const isProfessor = user.perfil === 'professor';
 
   const fetchData = async () => {
     const [a, t, d] = await Promise.all([
@@ -4454,8 +4582,21 @@ const ProfessorPortal = () => {
       api.get('/disciplinas')
     ]);
     setAlunos(a.data);
-    setTurmas(t.data);
-    setDisciplinas(d.data);
+    
+    if (isProfessor && user?.professor_id) {
+      const vRes = await api.get(`/professor-vinculos/${user.professor_id}`);
+      setProfessorVinculos(vRes.data);
+      
+      // Filter turmas and disciplinas based on vinculos
+      const linkedTurmaIds = [...new Set(vRes.data.map((v: any) => v.turma_id))];
+      const linkedDisciplinaIds = [...new Set(vRes.data.map((v: any) => v.disciplina_id))];
+      
+      setTurmas(t.data.filter((turma: any) => linkedTurmaIds.includes(turma.id)));
+      setDisciplinas(d.data.filter((disc: any) => linkedDisciplinaIds.includes(disc.id)));
+    } else {
+      setTurmas(t.data);
+      setDisciplinas(d.data);
+    }
   };
 
   useEffect(() => {
@@ -4793,32 +4934,74 @@ const ProfessorPortal = () => {
                           <tr key={a.id}>
                             <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-2">
                                 {selectedDisciplina?.tipo_avaliacao === 'nota' ? (
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    defaultValue={nota?.valor || ''}
-                                    onBlur={(e) => {
-                                      const val = parseFloat(e.target.value);
-                                      if (!isNaN(val)) {
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Nota:</span>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      defaultValue={nota?.valor || ''}
+                                      onBlur={(e) => {
+                                        const val = parseFloat(e.target.value);
                                         api.post('/notas', { 
                                           aluno_id: a.id, 
                                           disciplina_id: disciplinaId, 
                                           turma_id: turmaId,
                                           bimestre: parseInt(bimestre),
-                                          valor: val
+                                          valor: isNaN(val) ? null : val,
+                                          conceito: nota?.conceito,
+                                          observacao: nota?.observacao
                                         });
-                                      }
-                                    }}
-                                    className="w-20 px-2 py-1 border rounded"
-                                  />
+                                      }}
+                                      className="w-20 px-2 py-1 border rounded text-sm"
+                                    />
+                                  </div>
                                 ) : (
-                                  <span className="font-bold text-indigo-600">{nota?.conceito || '-'}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Conceito:</span>
+                                    <select
+                                      defaultValue={nota?.conceito || ''}
+                                      onChange={(e) => {
+                                        api.post('/notas', { 
+                                          aluno_id: a.id, 
+                                          disciplina_id: disciplinaId, 
+                                          turma_id: turmaId,
+                                          bimestre: parseInt(bimestre),
+                                          valor: nota?.valor,
+                                          conceito: e.target.value,
+                                          observacao: nota?.observacao
+                                        });
+                                      }}
+                                      className="px-2 py-1 border rounded text-sm bg-white"
+                                    >
+                                      <option value="">Selecione</option>
+                                      <option value="Iniciado">Iniciado (I)</option>
+                                      <option value="Em Desenvolvimento">Em Desenvolvimento (ED)</option>
+                                      <option value="Desenvolvido">Desenvolvido (D)</option>
+                                    </select>
+                                  </div>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-slate-500 italic">{nota?.observacao || '-'}</td>
+                            <td className="px-6 py-4">
+                              <textarea
+                                defaultValue={nota?.observacao || ''}
+                                onBlur={(e) => {
+                                  api.post('/notas', { 
+                                    aluno_id: a.id, 
+                                    disciplina_id: disciplinaId, 
+                                    turma_id: turmaId,
+                                    bimestre: parseInt(bimestre),
+                                    valor: nota?.valor,
+                                    conceito: nota?.conceito,
+                                    observacao: e.target.value
+                                  });
+                                }}
+                                className="w-full px-2 py-1 border rounded text-sm h-12"
+                                placeholder="Observações..."
+                              />
+                            </td>
                           </tr>
                         );
                       })}

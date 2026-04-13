@@ -211,6 +211,13 @@ CREATE TABLE IF NOT EXISTS professores (
   nome TEXT,
   especialidade TEXT
 );
+CREATE TABLE IF NOT EXISTS professor_vinculos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  funcionario_id INTEGER,
+  disciplina_id INTEGER,
+  turma_id INTEGER
+);
 CREATE TABLE IF NOT EXISTS matriculas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER,
@@ -542,11 +549,11 @@ app.get('/api/health', async (c) => {
 
       const data = await c.req.json();
       const { 
-        nome, cpf, rg, data_nascimento, cidade_nascimento, 
-        cep, endereco, numero, bairro, cidade, estado, 
-        foto, nome_pai, nome_mae, responsavel_legal, 
-        telefone, email, problemas_saude, problemas_saude_outros,
-        uso_medicamentos, medicamentos_quais, whatsapp_responsavel, email_responsavel
+        nome, cpf, rg = null, data_nascimento, cidade_nascimento = null, 
+        cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
+        foto = null, nome_pai = null, nome_mae = null, responsavel_legal = null, 
+        telefone = null, email = null, problemas_saude = [], problemas_saude_outros = null,
+        uso_medicamentos = 0, medicamentos_quais = null, whatsapp_responsavel = null, email_responsavel = null
       } = data;
       
       const turma_id = toInt(data.turma_id);
@@ -567,7 +574,7 @@ app.get('/api/health', async (c) => {
         nome, cpf, rg, data_nascimento, cidade_nascimento, 
         cep, endereco, numero, bairro, cidade, estado, 
         foto, nome_pai, nome_mae, responsavel_legal, 
-        telefone, email, JSON.stringify(problemas_saude || []), problemas_saude_outros,
+        telefone, email, JSON.stringify(problemas_saude), problemas_saude_outros,
         uso_medicamentos ? 1 : 0, medicamentos_quais, turma_id, posicao_sala,
         fileira, assento, whatsapp_responsavel, email_responsavel, c.get('user').empresa_id
       );
@@ -587,8 +594,8 @@ app.get('/api/health', async (c) => {
 
       const data = await c.req.json();
       const { 
-        nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
-        telefone, email, foto, cargo, data_admissao
+        nome, cpf, rg = null, cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
+        telefone = null, email = null, foto = null, cargo = null, data_admissao = null
       } = data;
       
       const disciplina_id = toInt(data.disciplina_id);
@@ -607,12 +614,11 @@ app.get('/api/health', async (c) => {
     });
 
     app.post('/api/funcionarios/:id', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
-
+      const db = new DBWrapper(c.env.DB);
       const data = await c.req.json();
       const { 
-        nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
-        telefone, email, foto, cargo, data_admissao
+        nome, cpf, rg = null, cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
+        telefone = null, email = null, foto = null, cargo = null, data_admissao = null
       } = data;
       
       const disciplina_id = toInt(data.disciplina_id);
@@ -627,6 +633,28 @@ app.get('/api/health', async (c) => {
         nome, cpf, rg, cep, endereco, numero, bairro, cidade, estado, 
         telefone, email, foto, cargo, data_admissao, disciplina_id, turma_id, c.req.param('id'), c.get('user').empresa_id
       );
+      return c.json({ success: true });
+    });
+
+    app.get('/api/professor-vinculos/:funcionarioId', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const rows = await db.prepare("SELECT * FROM professor_vinculos WHERE funcionario_id = ? AND empresa_id = ?").all(c.req.param('funcionarioId'), c.get('user').empresa_id);
+      return c.json(rows);
+    });
+
+    app.post('/api/professor-vinculos', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const { funcionario_id, vinculos } = await c.req.json();
+      
+      await db.prepare("DELETE FROM professor_vinculos WHERE funcionario_id = ? AND empresa_id = ?").run(funcionario_id, c.get('user').empresa_id);
+      
+      if (vinculos && Array.isArray(vinculos)) {
+        for (const v of vinculos) {
+          await db.prepare("INSERT INTO professor_vinculos (empresa_id, funcionario_id, disciplina_id, turma_id) VALUES (?, ?, ?, ?)")
+            .run(c.get('user').empresa_id, funcionario_id, v.disciplina_id, v.turma_id);
+        }
+      }
+      
       return c.json({ success: true });
     });
 
@@ -676,11 +704,11 @@ app.get('/api/health', async (c) => {
 
       const data = await c.req.json();
       const { 
-        nome, cpf, rg, data_nascimento, cidade_nascimento, 
-        cep, endereco, numero, bairro, cidade, estado, 
-        foto, nome_pai, nome_mae, responsavel_legal, 
-        telefone, email, problemas_saude, problemas_saude_outros,
-        uso_medicamentos, medicamentos_quais, whatsapp_responsavel, email_responsavel, motivo_remanejamento 
+        nome, cpf, rg = null, data_nascimento, cidade_nascimento = null, 
+        cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
+        foto = null, nome_pai = null, nome_mae = null, responsavel_legal = null, 
+        telefone = null, email = null, problemas_saude = [], problemas_saude_outros = null,
+        uso_medicamentos = 0, medicamentos_quais = null, whatsapp_responsavel = null, email_responsavel = null, motivo_remanejamento = null 
       } = data;
       
       const turma_id = toInt(data.turma_id);
@@ -708,7 +736,7 @@ app.get('/api/health', async (c) => {
         nome, cpf, rg, data_nascimento, cidade_nascimento, 
         cep, endereco, numero, bairro, cidade, estado, 
         foto, nome_pai, nome_mae, responsavel_legal, 
-        telefone, email, JSON.stringify(problemas_saude || []), problemas_saude_outros,
+        telefone, email, JSON.stringify(problemas_saude), problemas_saude_outros,
         uso_medicamentos ? 1 : 0, medicamentos_quais, turma_id, posicao_sala,
         fileira, assento, whatsapp_responsavel, email_responsavel, c.req.param('id'), c.get('user').empresa_id
       );
