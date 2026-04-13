@@ -121,13 +121,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         })
         .catch(() => setLoadingPerms(false));
       
-      if (user.perfil === 'admin') {
+      if (user.super_admin) {
         api.get('/todas-empresas').then(res => setTodasEmpresas(res.data));
       }
     } else {
       setLoadingPerms(false);
     }
-  }, [user.id, user.perfil]);
+  }, [user.id, user.super_admin]);
 
   const handleSwitchEmpresa = (id: string) => {
     localStorage.setItem('activeEmpresaId', id);
@@ -136,9 +136,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const isAdmin = user.perfil === 'admin';
+  const isSuperAdmin = user.super_admin === true;
   const isProfessor = user.perfil === 'professor';
 
   const hasAccess = (tela: string) => {
+    if (isSuperAdmin) return true;
     if (isAdmin) return true;
     const perm = userPerms.find(p => p.tela === tela);
     return perm?.pode_acessar === 1;
@@ -189,7 +191,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <h1 className="text-xl font-bold tracking-tight text-slate-800">EduManager</h1>
         </div>
 
-        {isAdmin && todasEmpresas.length > 1 && (
+        {isSuperAdmin && todasEmpresas.length > 1 && (
           <div className="mb-6 px-2">
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Unidade Escolar</label>
             <select 
@@ -206,6 +208,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
         <nav className="flex flex-col gap-2 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-12 lg:mt-0">
           {hasAccess('Painel') && <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Painel" active={location.pathname === '/dashboard'} />}
+          {isSuperAdmin && <SidebarItem to="/escolas" icon={School} label="Escolas" active={location.pathname === '/escolas'} />}
           
           {hasAccess('Mural do Aluno') && (
             <SidebarItem to="/mural" icon={BookOpen} label="Mural do Aluno" active={location.pathname === '/mural'} />
@@ -6116,6 +6119,128 @@ const Transferencias = () => {
   );
 };
 
+const Escolas = () => {
+  const [escolas, setEscolas] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState<any>({});
+  const [loading, setLoading] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const res = await api.get('/todas-empresas');
+      setEscolas(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar escolas:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/empresas', formData);
+      setShowModal(false);
+      setFormData({});
+      fetchData();
+      alert('Escola cadastrada com sucesso!');
+    } catch (err) {
+      alert('Erro ao cadastrar escola');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Deseja realmente excluir esta escola? Todos os dados vinculados serão inacessíveis.')) {
+      try {
+        await api.delete(`/empresas/${id}`);
+        fetchData();
+      } catch (err) {
+        alert('Erro ao excluir escola');
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <header className="flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Escolas da Rede</h1>
+          <p className="text-slate-500 mt-1">Gerencie as unidades escolares da sua rede.</p>
+        </div>
+        <button
+          onClick={() => { setFormData({}); setShowModal(true); }}
+          className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Nova Escola
+        </button>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {escolas.map(e => (
+          <div key={e.id} className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-slate-200 transition-all group relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => handleDelete(e.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                <Trash2 size={18} />
+              </button>
+            </div>
+            <div className="bg-indigo-50 text-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+              <School size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">{e.nome}</h3>
+            <p className="text-slate-500 text-sm mb-6">ID: {e.id}</p>
+            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
+              Unidade Ativa
+              <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <AnimatePresence>
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg relative z-10 overflow-hidden">
+              <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h2 className="text-2xl font-bold text-slate-800">Nova Escola</h2>
+                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm"><X size={20} /></button>
+              </div>
+              <form onSubmit={handleSave} className="p-10 space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Nome da Instituição</label>
+                    <input type="text" value={formData.nome || ''} onChange={(e) => setFormData({...formData, nome: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">CNPJ</label>
+                    <input type="text" value={formData.cnpj || ''} onChange={(e) => setFormData({...formData, cnpj: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Endereço</label>
+                    <input type="text" value={formData.endereco || ''} onChange={(e) => setFormData({...formData, endereco: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-4 border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all">Cancelar</button>
+                  <button type="submit" disabled={loading} className="flex-1 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50">
+                    {loading ? 'Salvando...' : 'Cadastrar Escola'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // --- App Root ---
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -6135,6 +6260,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/escolas" element={<ProtectedRoute><Escolas /></ProtectedRoute>} />
         <Route path="/mural" element={<ProtectedRoute><MuralAluno /></ProtectedRoute>} />
         <Route path="/alunos" element={<ProtectedRoute><Alunos /></ProtectedRoute>} />
         <Route path="/funcionarios" element={<ProtectedRoute><Funcionarios /></ProtectedRoute>} />

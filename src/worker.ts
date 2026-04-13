@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   email TEXT UNIQUE,
   senha TEXT,
   perfil TEXT,
+  super_admin INTEGER DEFAULT 0,
   primeiro_acesso INTEGER DEFAULT 1,
   status TEXT DEFAULT 'ativo'
 );
@@ -365,7 +366,7 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
         .run("Escola EduManager", "00.000.000/0001-00", "Rua das Flores, 123 - Centro", "(11) 99999-9999", "contato@edumanager.com", "Dr. Roberto Silva", "Maria Oliveira", "Premium");
       
       const hash = bcrypt.hashSync('123', 10);
-      await db.prepare("INSERT INTO usuarios (empresa_id, nome, email, senha, perfil) VALUES (?, ?, ?, ?, ?)").run(1, 'Admin', 'admin@admin.com', hash, 'admin');
+      await db.prepare("INSERT INTO usuarios (empresa_id, nome, email, senha, perfil, super_admin) VALUES (?, ?, ?, ?, ?, ?)").run(1, 'Admin', 'admin@admin.com', hash, 'admin', 1);
       
       await db.prepare("INSERT INTO cursos (empresa_id, nome, descricao) VALUES (?, ?, ?)").run(1, 'Ensino Fundamental II', '6º ao 9º ano');
       await db.prepare("INSERT INTO disciplinas (empresa_id, curso_id, nome, carga_horaria) VALUES (?, ?, ?, ?)").run(1, 1, 'Matemática', 80);
@@ -419,7 +420,8 @@ app.get('/api/health', async (c) => {
         professor_id: user.professor_id,
         funcionario_id: user.funcionario_id,
         nome: user.nome, 
-        perfil: user.perfil 
+        perfil: user.perfil,
+        super_admin: user.super_admin === 1
       }, JWT_SECRET);
       
       return c.json({ 
@@ -429,6 +431,8 @@ app.get('/api/health', async (c) => {
           nome: user.nome, 
           email: user.email, 
           perfil: user.perfil, 
+          empresa_id: user.empresa_id,
+          super_admin: user.super_admin === 1,
           aluno_id: user.aluno_id, 
           professor_id: user.professor_id,
           funcionario_id: user.funcionario_id,
@@ -691,10 +695,25 @@ app.get('/api/health', async (c) => {
     });
 
     app.get('/api/todas-empresas', auth, async (c) => {
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
+      if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const db = new DBWrapper(c.env.DB);
       const rows = await db.prepare("SELECT id, nome FROM empresas").all();
       return c.json(rows);
+    });
+
+    app.post('/api/empresas', auth, async (c) => {
+      if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      const db = new DBWrapper(c.env.DB);
+      const { nome, cnpj, endereco, telefone, email } = await c.req.json();
+      const res = await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email) VALUES (?, ?, ?, ?, ?)").run(nome, cnpj, endereco, telefone, email);
+      return c.json({ id: res.lastInsertRowid });
+    });
+
+    app.delete('/api/empresas/:id', auth, async (c) => {
+      if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      const db = new DBWrapper(c.env.DB);
+      await db.prepare("DELETE FROM empresas WHERE id = ?").run(c.req.param('id'));
+      return c.json({ success: true });
     });
 
     app.get('/api/transferencias', auth, async (c) => {
