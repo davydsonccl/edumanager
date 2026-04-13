@@ -143,7 +143,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         if (res.data) {
           applyTheme(res.data.cor_primaria, res.data.tema);
         }
-      });
+      }).catch(err => console.error('Erro ao carregar tema da empresa:', err));
 
       api.get(`/permissoes/${user.id}`)
         .then(res => {
@@ -167,7 +167,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const isAdmin = user.perfil === 'admin';
-  const isSuperAdmin = user.super_admin === true;
+  const isSuperAdmin = !!user.super_admin;
   const isProfessor = user.perfil === 'professor';
 
   const hasAccess = (tela: string) => {
@@ -309,7 +309,7 @@ const Login = () => {
     setLoading(true);
     try {
       const res = await api.post('/login', { email, senha });
-      if (res.data.user.perfil === 'aluno' && res.data.user.primeiro_acesso) {
+      if (res.data.user.primeiro_acesso) {
         localStorage.setItem('tempToken', res.data.token);
         localStorage.setItem('tempUser', JSON.stringify(res.data.user));
         setMustChangePassword(true);

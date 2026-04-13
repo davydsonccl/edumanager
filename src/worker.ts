@@ -79,16 +79,16 @@ const auth = async (c: any, next: any) => {
   try {
     const decoded: any = jwt.verify(token, JWT_SECRET);
     
-    // Support switching schools for admins
+    // Support switching schools for super admins
     const requestedEmpresaId = c.req.header('x-empresa-id');
-    if (requestedEmpresaId && (decoded.perfil === 'admin' || decoded.super_admin)) {
+    if (requestedEmpresaId && decoded.super_admin) {
       const parsedId = parseInt(requestedEmpresaId);
       if (!isNaN(parsedId)) {
         decoded.empresa_id = parsedId;
       }
     }
     
-    c.set('user', decoded);
+    c.set('user', { ...decoded });
     await next();
   } catch (err) {
     return c.json({ error: 'Token inválido' }, 401);
@@ -236,18 +236,18 @@ CREATE TABLE IF NOT EXISTS permissoes (
   pode_editar INTEGER DEFAULT 0,
   pode_excluir INTEGER DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS professores (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  empresa_id INTEGER,
-  nome TEXT,
-  especialidade TEXT
-);
 CREATE TABLE IF NOT EXISTS professor_vinculos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER,
   funcionario_id INTEGER,
   disciplina_id INTEGER,
   turma_id INTEGER
+);
+CREATE TABLE IF NOT EXISTS professores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER,
+  nome TEXT,
+  especialidade TEXT
 );
 CREATE TABLE IF NOT EXISTS matriculas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -468,8 +468,8 @@ app.get('/api/health', async (c) => {
 
     app.post('/api/usuarios/reset-password', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
-
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
+      const user = c.get('user');
+      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const { usuario_id, nova_senha } = await c.req.json();
       const hash = bcrypt.hashSync(nova_senha, 10);
       await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
@@ -478,8 +478,8 @@ app.get('/api/health', async (c) => {
 
     app.post('/api/usuarios/criar', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
-
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
+      const user = c.get('user');
+      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const data = await c.req.json();
       const { nome, email, senha, perfil } = data;
       const aluno_id = toInt(data.aluno_id);
@@ -503,7 +503,8 @@ app.get('/api/health', async (c) => {
 
     app.put('/api/usuarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
+      const user = c.get('user');
+      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const data = await c.req.json();
       const { nome, email, perfil, status } = data;
       const curso_id = toInt(data.curso_id);
@@ -519,8 +520,9 @@ app.get('/api/health', async (c) => {
 
     app.delete('/api/usuarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      if (c.get('user').perfil !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
-      await db.prepare("DELETE FROM usuarios WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const user = c.get('user');
+      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      await db.prepare("DELETE FROM usuarios WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), user.empresa_id);
       return c.json({ success: true });
     });
 
@@ -539,8 +541,8 @@ app.get('/api/health', async (c) => {
       const currentUser = c.get('user');
       const existing = await db.prepare("SELECT cor_primaria, tema FROM empresas WHERE id = ?").get(currentUser.empresa_id) as any;
       
-      const finalCor = currentUser.super_admin ? cor_primaria : existing.cor_primaria;
-      const finalTema = currentUser.super_admin ? tema : existing.tema;
+      const finalCor = currentUser.super_admin ? cor_primaria : (existing?.cor_primaria || '#4f46e5');
+      const finalTema = currentUser.super_admin ? tema : (existing?.tema || 'light');
 
       await db.prepare(`
         UPDATE empresas SET 
@@ -1010,7 +1012,7 @@ app.get('/api/health', async (c) => {
         'alunos', 'matriculas', 'notas', 'frequencias', 
         'historico_remanejamentos', 'financeiro', 'comunicados', 
         'comunicados_lidos', 'solicitacoes_documentos', 'solicitacoes_financeiras',
-        'funcionarios', 'permissoes'
+        'funcionarios', 'permissoes', 'professor_vinculos', 'professores'
       ];
       
       for (const table of tables) {
