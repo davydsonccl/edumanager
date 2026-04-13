@@ -22,7 +22,10 @@ const d1Mock = {
           },
           run: async () => {
             const info = stmt.run(...params);
-            return { lastInsertRowid: info.lastInsertRowid };
+            return { 
+              lastInsertRowid: info.lastInsertRowid,
+              meta: { last_row_id: info.lastInsertRowid }
+            };
           }
         };
       }
@@ -47,10 +50,10 @@ mainApp.route('/', app);
 const initDb = async () => {
   try {
     console.log('Initializing database...');
-    // We can't easily call the route handler directly with Hono without a request object
-    // So we'll just trigger it via a local fetch if needed, or just wait for the first request
-    // Actually, let's just use the logic from worker.ts if we can, but it's inside the route.
-    // For now, let's just log that it's ready.
+    // We call the init-db logic by simulating a request to the app
+    const res = await mainApp.request('/api/init-db', { method: 'POST' });
+    const data = await res.json();
+    console.log('Database initialization result:', data);
   } catch (err) {
     console.error('Failed to initialize database:', err);
   }
