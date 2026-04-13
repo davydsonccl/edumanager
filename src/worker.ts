@@ -31,7 +31,7 @@ class DBWrapper {
       run: async (...params: any[]) => {
         try {
           const res = await stmt.bind(...params).run();
-          return { lastInsertRowid: res.meta.last_row_id };
+          return { lastInsertRowid: res?.meta?.last_row_id || res?.lastRowId || null };
         } catch (e: any) {
           throw e;
         }
@@ -82,7 +82,10 @@ const auth = async (c: any, next: any) => {
     // Support switching schools for admins
     const requestedEmpresaId = c.req.header('x-empresa-id');
     if (requestedEmpresaId && (decoded.perfil === 'admin' || decoded.super_admin)) {
-      decoded.empresa_id = parseInt(requestedEmpresaId);
+      const parsedId = parseInt(requestedEmpresaId);
+      if (!isNaN(parsedId)) {
+        decoded.empresa_id = parsedId;
+      }
     }
     
     c.set('user', decoded);
@@ -94,6 +97,11 @@ const auth = async (c: any, next: any) => {
 
 
 app.post('/api/init-db', async (c) => {
+  console.log('Iniciando init-db...');
+  if (!c.env.DB) {
+    console.error('Erro: c.env.DB não encontrado');
+    return c.json({ error: 'Database binding missing' }, 500);
+  }
   const db = new DBWrapper(c.env.DB);
   try {
     const schema = `
@@ -109,7 +117,9 @@ CREATE TABLE IF NOT EXISTS empresas (
   plano TEXT,
   logo_url TEXT,
   msg_cobranca_whatsapp TEXT,
-  msg_cobranca_email TEXT
+  msg_cobranca_email TEXT,
+  cor_primaria TEXT DEFAULT '#4f46e5',
+  tema TEXT DEFAULT 'light'
 );
 CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -346,7 +356,9 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       "ALTER TABLE funcionarios ADD COLUMN disciplina_id INTEGER",
       "ALTER TABLE funcionarios ADD COLUMN turma_id INTEGER",
       "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER",
-      "ALTER TABLE usuarios ADD COLUMN super_admin INTEGER DEFAULT 0"
+      "ALTER TABLE usuarios ADD COLUMN super_admin INTEGER DEFAULT 0",
+      "ALTER TABLE empresas ADD COLUMN cor_primaria TEXT DEFAULT '#4f46e5'",
+      "ALTER TABLE empresas ADD COLUMN tema TEXT DEFAULT 'light'"
     ];
 
     for (const m of migrations) {
@@ -521,14 +533,23 @@ app.get('/api/health', async (c) => {
 
     app.post('/api/empresa', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      const { nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email } = await c.req.json();
+      const { nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, cor_primaria, tema } = await c.req.json();
+      
+      // Only super_admin can change theme and primary color
+      const currentUser = c.get('user');
+      const existing = await db.prepare("SELECT cor_primaria, tema FROM empresas WHERE id = ?").get(currentUser.empresa_id) as any;
+      
+      const finalCor = currentUser.super_admin ? cor_primaria : existing.cor_primaria;
+      const finalTema = currentUser.super_admin ? tema : existing.tema;
+
       await db.prepare(`
         UPDATE empresas SET 
           nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, 
           diretor = ?, secretario = ?, logo_url = ?, 
-          msg_cobranca_whatsapp = ?, msg_cobranca_email = ? 
+          msg_cobranca_whatsapp = ?, msg_cobranca_email = ?,
+          cor_primaria = ?, tema = ?
         WHERE id = ?
-      `).run(nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, c.get('user').empresa_id);
+      `).run(nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, finalCor, finalTema, currentUser.empresa_id);
       return c.json({ success: true });
     });
 
@@ -708,9 +729,30 @@ app.get('/api/health', async (c) => {
     app.post('/api/empresas', auth, async (c) => {
       if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const db = new DBWrapper(c.env.DB);
-      const { nome, cnpj, endereco, telefone, email } = await c.req.json();
-      const res = await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email) VALUES (?, ?, ?, ?, ?)").run(nome, cnpj, endereco, telefone, email);
-      return c.json({ id: res.lastInsertRowid });
+      try {
+        const { nome, cnpj, endereco, telefone, email } = await c.req.json();
+        if (!nome) return c.json({ error: 'Nome da escola é obrigatório' }, 400);
+        
+        const res = await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email) VALUES (?, ?, ?, ?, ?)").run(nome, cnpj, endereco, telefone, email);
+        return c.json({ id: res.lastInsertRowid });
+      } catch (err: any) {
+        console.error('Erro ao cadastrar empresa:', err);
+        return c.json({ error: err.message }, 500);
+      }
+    });
+
+    app.put('/api/empresas/:id', auth, async (c) => {
+      if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      const db = new DBWrapper(c.env.DB);
+      const { nome, cnpj, endereco, telefone, email, cor_primaria, tema, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email } = await c.req.json();
+      await db.prepare(`
+        UPDATE empresas SET 
+          nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, 
+          cor_primaria = ?, tema = ?, diretor = ?, secretario = ?, 
+          logo_url = ?, msg_cobranca_whatsapp = ?, msg_cobranca_email = ?
+        WHERE id = ?
+      `).run(nome, cnpj, endereco, telefone, email, cor_primaria, tema, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, c.req.param('id'));
+      return c.json({ success: true });
     });
 
     app.delete('/api/empresas/:id', auth, async (c) => {

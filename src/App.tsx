@@ -45,7 +45,10 @@ import {
   HelpCircle,
   AlertTriangle,
   ArrowRightLeft,
-  FileCheck
+  FileCheck,
+  Palette,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -95,6 +98,27 @@ const SidebarItem = ({ to, icon: Icon, label, active }: { to: string; icon: any;
   </Link>
 );
 
+const applyTheme = (color: string, theme: string) => {
+  if (!color) return;
+  
+  // Simple palette generation
+  const root = document.documentElement;
+  root.style.setProperty('--primary-600', color);
+  
+  // Generate darker/lighter versions (simplified)
+  root.style.setProperty('--primary-700', color); // Should be darker
+  root.style.setProperty('--primary-500', color); // Should be lighter
+  root.style.setProperty('--primary-50', `${color}10`);
+  root.style.setProperty('--primary-100', `${color}20`);
+  root.style.setProperty('--primary-200', `${color}30`);
+
+  if (theme === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+};
+
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -114,6 +138,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (user.id) {
+      // Fetch current empresa settings to apply theme
+      api.get('/empresa').then(res => {
+        if (res.data) {
+          applyTheme(res.data.cor_primaria, res.data.tema);
+        }
+      });
+
       api.get(`/permissoes/${user.id}`)
         .then(res => {
           setUserPerms(res.data);
@@ -127,7 +158,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     } else {
       setLoadingPerms(false);
     }
-  }, [user.id, user.super_admin]);
+  }, [user.id, user.super_admin, activeEmpresaId]);
 
   const handleSwitchEmpresa = (id: string) => {
     localStorage.setItem('activeEmpresaId', id);
@@ -2552,6 +2583,7 @@ const DocumentCard = ({ title, icon: Icon, description, onClick }: { title: stri
 const Settings = () => {
   const [empresa, setEmpresa] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
     api.get('/empresa').then(res => {
@@ -2725,6 +2757,68 @@ const Settings = () => {
                   />
                   <p className="text-[10px] text-slate-400 mt-1 italic">Tags: {'{aluno}'}, {'{responsavel}'}, {'{valor}'}</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Palette size={20} className="text-indigo-600" />
+            Personalização Visual
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-3">Cor Primária do Sistema</label>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="color" 
+                  value={empresa.cor_primaria || '#4f46e5'} 
+                  disabled={!user.super_admin}
+                  onChange={(e) => setEmpresa({...empresa, cor_primaria: e.target.value})}
+                  className="w-16 h-16 rounded-2xl border-4 border-white shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" 
+                />
+                <div className="flex-1">
+                  <input 
+                    type="text" 
+                    value={empresa.cor_primaria || '#4f46e5'} 
+                    disabled={!user.super_admin}
+                    onChange={(e) => setEmpresa({...empresa, cor_primaria: e.target.value})}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 uppercase font-mono text-sm disabled:bg-slate-50" 
+                  />
+                </div>
+              </div>
+              {!user.super_admin && <p className="text-[10px] text-slate-400 mt-2 italic">Somente o Administrador Master pode alterar as cores da rede.</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-3">Tema do Sistema</label>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  disabled={!user.super_admin}
+                  onClick={() => setEmpresa({...empresa, tema: 'light'})}
+                  className={cn(
+                    "flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2",
+                    empresa.tema === 'light' ? "border-indigo-600 bg-indigo-50 text-indigo-600" : "border-slate-100 hover:border-slate-200 text-slate-500",
+                    !user.super_admin && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <Sun size={24} />
+                  <span className="font-bold text-sm">Claro</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!user.super_admin}
+                  onClick={() => setEmpresa({...empresa, tema: 'dark'})}
+                  className={cn(
+                    "flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2",
+                    empresa.tema === 'dark' ? "border-indigo-600 bg-indigo-50 text-indigo-600" : "border-slate-100 hover:border-slate-200 text-slate-500",
+                    !user.super_admin && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  <Moon size={24} />
+                  <span className="font-bold text-sm">Escuro</span>
+                </button>
               </div>
             </div>
           </div>
@@ -6149,13 +6243,18 @@ const Escolas = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/empresas', formData);
+      if (formData.id) {
+        await api.put(`/empresas/${formData.id}`, formData);
+        alert('Escola atualizada com sucesso!');
+      } else {
+        await api.post('/empresas', formData);
+        alert('Escola cadastrada com sucesso!');
+      }
       setShowModal(false);
       setFormData({});
       fetchData();
-      alert('Escola cadastrada com sucesso!');
     } catch (err) {
-      alert('Erro ao cadastrar escola');
+      alert('Erro ao salvar escola');
     } finally {
       setLoading(false);
     }
@@ -6191,7 +6290,10 @@ const Escolas = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {escolas.map(e => (
           <div key={e.id} className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-slate-200 transition-all group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+              <button onClick={() => { setFormData(e); setShowModal(true); }} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">
+                <SettingsIcon size={18} />
+              </button>
               <button onClick={() => handleDelete(e.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
                 <Trash2 size={18} />
               </button>
@@ -6215,10 +6317,10 @@ const Escolas = () => {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg relative z-10 overflow-hidden">
               <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-2xl font-bold text-slate-800">Nova Escola</h2>
+                <h2 className="text-2xl font-bold text-slate-800">{formData.id ? 'Editar Escola' : 'Nova Escola'}</h2>
                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm"><X size={20} /></button>
               </div>
-              <form onSubmit={handleSave} className="p-10 space-y-6">
+              <form onSubmit={handleSave} className="p-10 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Nome da Instituição</label>
@@ -6232,11 +6334,19 @@ const Escolas = () => {
                     <label className="block text-sm font-bold text-slate-700 mb-2">Endereço</label>
                     <input type="text" value={formData.endereco || ''} onChange={(e) => setFormData({...formData, endereco: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
                   </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Telefone</label>
+                    <input type="text" value={formData.telefone || ''} onChange={(e) => setFormData({...formData, telefone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">E-mail</label>
+                    <input type="email" value={formData.email || ''} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-4 border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all">Cancelar</button>
                   <button type="submit" disabled={loading} className="flex-1 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50">
-                    {loading ? 'Salvando...' : 'Cadastrar Escola'}
+                    {loading ? 'Salvando...' : (formData.id ? 'Atualizar Escola' : 'Cadastrar Escola')}
                   </button>
                 </div>
               </form>
