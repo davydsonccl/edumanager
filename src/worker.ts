@@ -548,7 +548,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const data = await c.req.json();
-      const { 
+      let { 
         nome, cpf, rg = null, data_nascimento, cidade_nascimento = null, 
         cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
         foto = null, nome_pai = null, nome_mae = null, responsavel_legal = null, 
@@ -556,6 +556,15 @@ app.get('/api/health', async (c) => {
         uso_medicamentos = 0, medicamentos_quais = null, whatsapp_responsavel = null, email_responsavel = null
       } = data;
       
+      // Clean CPF
+      cpf = cpf ? cpf.replace(/\D/g, '') : null;
+      if (cpf) {
+        const existing = await db.prepare("SELECT id FROM alunos WHERE cpf = ? AND empresa_id = ?").get(cpf, c.get('user').empresa_id);
+        if (existing) {
+          return c.json({ error: 'Já existe um aluno cadastrado com este CPF.' }, 400);
+        }
+      }
+
       const turma_id = toInt(data.turma_id);
       const posicao_sala = toInt(data.posicao_sala);
       const fileira = toInt(data.fileira);
@@ -593,11 +602,20 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const data = await c.req.json();
-      const { 
+      let { 
         nome, cpf, rg = null, cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
         telefone = null, email = null, foto = null, cargo = null, data_admissao = null
       } = data;
       
+      // Clean CPF
+      cpf = cpf ? cpf.replace(/\D/g, '') : null;
+      if (cpf) {
+        const existing = await db.prepare("SELECT id FROM funcionarios WHERE cpf = ? AND empresa_id = ?").get(cpf, c.get('user').empresa_id);
+        if (existing) {
+          return c.json({ error: 'Já existe um funcionário cadastrado com este CPF.' }, 400);
+        }
+      }
+
       const disciplina_id = toInt(data.disciplina_id);
       const turma_id = toInt(data.turma_id);
 
@@ -616,11 +634,20 @@ app.get('/api/health', async (c) => {
     app.post('/api/funcionarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const data = await c.req.json();
-      const { 
+      let { 
         nome, cpf, rg = null, cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
         telefone = null, email = null, foto = null, cargo = null, data_admissao = null
       } = data;
       
+      // Clean CPF
+      cpf = cpf ? cpf.replace(/\D/g, '') : null;
+      if (cpf) {
+        const existing = await db.prepare("SELECT id FROM funcionarios WHERE cpf = ? AND empresa_id = ? AND id != ?").get(cpf, c.get('user').empresa_id, c.req.param('id'));
+        if (existing) {
+          return c.json({ error: 'Já existe outro funcionário cadastrado com este CPF.' }, 400);
+        }
+      }
+
       const disciplina_id = toInt(data.disciplina_id);
       const turma_id = toInt(data.turma_id);
 
@@ -703,7 +730,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const data = await c.req.json();
-      const { 
+      let { 
         nome, cpf, rg = null, data_nascimento, cidade_nascimento = null, 
         cep = null, endereco = null, numero = null, bairro = null, cidade = null, estado = null, 
         foto = null, nome_pai = null, nome_mae = null, responsavel_legal = null, 
@@ -711,6 +738,15 @@ app.get('/api/health', async (c) => {
         uso_medicamentos = 0, medicamentos_quais = null, whatsapp_responsavel = null, email_responsavel = null, motivo_remanejamento = null 
       } = data;
       
+      // Clean CPF
+      cpf = cpf ? cpf.replace(/\D/g, '') : null;
+      if (cpf) {
+        const existing = await db.prepare("SELECT id FROM alunos WHERE cpf = ? AND empresa_id = ? AND id != ?").get(cpf, c.get('user').empresa_id, c.req.param('id'));
+        if (existing) {
+          return c.json({ error: 'Já existe outro aluno cadastrado com este CPF.' }, 400);
+        }
+      }
+
       const turma_id = toInt(data.turma_id);
       const posicao_sala = toInt(data.posicao_sala);
       const fileira = toInt(data.fileira);

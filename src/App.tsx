@@ -3672,7 +3672,12 @@ const Funcionarios = () => {
           <p className="text-slate-500 mt-1">Gestão de equipe e colaboradores.</p>
         </div>
         <button
-          onClick={() => { setEditingItem(null); setFormData({}); setShowModal(true); }}
+          onClick={() => { 
+            setEditingItem(null); 
+            setFormData({}); 
+            setVinculos([]); 
+            setShowModal(true); 
+          }}
           className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
         >
           <Plus size={20} />
@@ -4143,9 +4148,9 @@ const ControleAcesso = () => {
           nome: selectedRecord.nome,
           email: userEmail,
           senha: tempPassword,
-          perfil: selectedRecord.tipo === 'aluno' ? 'aluno' : (selectedRecord.cargo === 'Professor' ? 'professor' : 'funcionario'),
+          perfil: selectedRecord.tipo === 'aluno' ? 'aluno' : (['Professor', 'Professor(a)'].includes(selectedRecord.cargo) ? 'professor' : 'funcionario'),
           aluno_id: selectedRecord.tipo === 'aluno' ? selectedRecord.id : null,
-          professor_id: selectedRecord.tipo === 'funcionario' && selectedRecord.cargo === 'Professor' ? selectedRecord.id : null,
+          professor_id: selectedRecord.tipo === 'funcionario' && ['Professor', 'Professor(a)'].includes(selectedRecord.cargo) ? selectedRecord.id : null,
           funcionario_id: selectedRecord.tipo === 'funcionario' ? selectedRecord.id : null
         });
         userId = res.data.id;
@@ -4701,6 +4706,35 @@ const ProfessorPortal = () => {
     ? alunos.filter(a => a.turma_id === parseInt(turmaId)) 
     : [];
 
+  const availableDisciplinas = useMemo(() => {
+    if (!turmaId) return [];
+    
+    let filtered = disciplinas;
+    
+    // If professor, filter by vinculos for the selected turma
+    if (isProfessor && user?.professor_id) {
+      const linkedDisciplinaIds = professorVinculos
+        .filter((v: any) => v.turma_id === parseInt(turmaId))
+        .map((v: any) => v.disciplina_id);
+      
+      filtered = disciplinas.filter((d: any) => linkedDisciplinaIds.includes(d.id));
+    } else {
+      // If admin, filter disciplines by the course of the selected turma
+      const selectedTurma = turmas.find(t => t.id === parseInt(turmaId));
+      if (selectedTurma) {
+        filtered = disciplinas.filter((d: any) => d.curso_id === selectedTurma.curso_id);
+      }
+    }
+    
+    return filtered;
+  }, [turmaId, disciplinas, isProfessor, professorVinculos, user?.professor_id, turmas]);
+
+  useEffect(() => {
+    if (disciplinaId && !availableDisciplinas.find(d => d.id === parseInt(disciplinaId))) {
+      setDisciplinaId('');
+    }
+  }, [availableDisciplinas, disciplinaId]);
+
   const selectedDisciplina = disciplinas.find(d => d.id === parseInt(disciplinaId));
 
   return (
@@ -4753,7 +4787,7 @@ const ProfessorPortal = () => {
               className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
             >
               <option value="">Selecione uma disciplina</option>
-              {disciplinas.map(d => <option key={d.id} value={d.id}>{d.nome} ({d.tipo_avaliacao})</option>)}
+              {availableDisciplinas.map(d => <option key={d.id} value={d.id}>{d.nome} ({d.tipo_avaliacao})</option>)}
             </select>
           </div>
           <div>
