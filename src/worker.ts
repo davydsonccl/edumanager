@@ -81,7 +81,7 @@ const auth = async (c: any, next: any) => {
     
     // Support switching schools for admins
     const requestedEmpresaId = c.req.header('x-empresa-id');
-    if (requestedEmpresaId && decoded.perfil === 'admin') {
+    if (requestedEmpresaId && (decoded.perfil === 'admin' || decoded.super_admin)) {
       decoded.empresa_id = parseInt(requestedEmpresaId);
     }
     
@@ -345,7 +345,8 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       "ALTER TABLE alunos ADD COLUMN email_responsavel TEXT",
       "ALTER TABLE funcionarios ADD COLUMN disciplina_id INTEGER",
       "ALTER TABLE funcionarios ADD COLUMN turma_id INTEGER",
-      "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER"
+      "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER",
+      "ALTER TABLE usuarios ADD COLUMN super_admin INTEGER DEFAULT 0"
     ];
 
     for (const m of migrations) {
@@ -358,6 +359,9 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
         }
       }
     }
+
+    // Ensure admin@admin.com is super_admin
+    await db.prepare("UPDATE usuarios SET super_admin = 1 WHERE email = 'admin@admin.com'").run();
 
     // Seed initial data
     const empresaCount = await db.prepare("SELECT count(*) as count FROM empresas").get() as any;
@@ -947,7 +951,7 @@ app.get('/api/health', async (c) => {
     });
 
     app.post('/api/system/reset-db', auth, async (c) => {
-      if (c.get('user').perfil !== 'admin') {
+      if (!c.get('user').super_admin) {
         return c.json({ error: 'Acesso negado' }, 403);
       }
       const db = new DBWrapper(c.env.DB);

@@ -210,7 +210,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           {hasAccess('Painel') && <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Painel" active={location.pathname === '/dashboard'} />}
           {isSuperAdmin && <SidebarItem to="/escolas" icon={School} label="Escolas" active={location.pathname === '/escolas'} />}
           
-          {hasAccess('Mural do Aluno') && (
+          {hasAccess('Mural do Aluno') && !isAdmin && !isSuperAdmin && (
             <SidebarItem to="/mural" icon={BookOpen} label="Mural do Aluno" active={location.pathname === '/mural'} />
           )}
           
@@ -1310,7 +1310,9 @@ const Academic = () => {
 };
 
 const MuralAluno = () => {
+  const { alunoId: urlAlunoId } = useParams();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const alunoId = urlAlunoId || user.aluno_id;
   const [data, setData] = useState<any>(null);
   const [comunicados, setComunicados] = useState<any[]>([]);
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
@@ -1326,18 +1328,22 @@ const MuralAluno = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    if (!user.aluno_id) {
-      setError('Acesso negado: Este usuário não possui um ID de aluno vinculado.');
+    if (!alunoId) {
+      if (user.perfil === 'admin' || user.super_admin) {
+        setError('Dica: Como administrador, você deve acessar o mural através da gestão de alunos.');
+      } else {
+        setError('Acesso negado: Este usuário não possui um ID de aluno vinculado.');
+      }
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
       const [portalRes, comRes, solRes, finSolRes] = await Promise.all([
-        api.get(`/portal-aluno/${user.aluno_id}`),
-        api.get(`/comunicados-aluno/${user.aluno_id}`),
-        api.get(`/solicitacoes-documentos?aluno_id=${user.aluno_id}`),
-        api.get(`/solicitacoes-financeiras?aluno_id=${user.aluno_id}`)
+        api.get(`/portal-aluno/${alunoId}`),
+        api.get(`/comunicados-aluno/${alunoId}`),
+        api.get(`/solicitacoes-documentos?aluno_id=${alunoId}`),
+        api.get(`/solicitacoes-financeiras?aluno_id=${alunoId}`)
       ]);
       setData(portalRes.data);
       setComunicados(comRes.data);
@@ -1354,11 +1360,11 @@ const MuralAluno = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [alunoId]);
 
   const handleMarcarLido = async (id: number) => {
     try {
-      await api.post('/comunicados/marcar-lido', { comunicado_id: id, aluno_id: user.aluno_id });
+      await api.post('/comunicados/marcar-lido', { comunicado_id: id, aluno_id: alunoId });
       fetchData();
     } catch (err) {
       alert('Erro ao marcar como lido');
@@ -1369,7 +1375,7 @@ const MuralAluno = () => {
     e.preventDefault();
     try {
       await api.post('/solicitacoes-documentos', { 
-        aluno_id: user.aluno_id, 
+        aluno_id: alunoId, 
         tipo_documento: docType, 
         observacao: docObs 
       });
@@ -1386,7 +1392,7 @@ const MuralAluno = () => {
     e.preventDefault();
     try {
       await api.post('/solicitacoes-financeiras', { 
-        aluno_id: user.aluno_id, 
+        aluno_id: alunoId, 
         financeiro_id: selectedFinId,
         observacao: finObs 
       });
@@ -1403,12 +1409,10 @@ const MuralAluno = () => {
 
   if (error) return (
     <div className="p-10 flex flex-col items-center justify-center space-y-4">
-      <div className="bg-red-50 text-red-600 p-6 rounded-2xl border border-red-100 max-w-md text-center">
-        <p className="font-bold">{error}</p>
+      <div className="bg-indigo-50 text-indigo-600 p-8 rounded-[32px] border border-indigo-100 max-w-md text-center shadow-xl shadow-indigo-50">
+        <LayoutDashboard size={48} className="mx-auto mb-4 opacity-50" />
+        <p className="font-bold text-lg leading-tight">{error}</p>
       </div>
-      {user.perfil === 'admin' && (
-        <p className="text-slate-500 text-sm italic">Dica: Como administrador, você deve acessar o mural através da gestão de alunos (em breve).</p>
-      )}
     </div>
   );
 
@@ -3091,6 +3095,9 @@ const Alunos = () => {
                         </button>
                         <Link to={`/boletim/${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Ver Boletim">
                           <BookOpen size={18} />
+                        </Link>
+                        <Link to={`/mural/${aluno.id}`} className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all" title="Ver Mural">
+                          <LayoutDashboard size={18} />
                         </Link>
                         <button 
                           onClick={() => { 
@@ -6262,6 +6269,7 @@ export default function App() {
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/escolas" element={<ProtectedRoute><Escolas /></ProtectedRoute>} />
         <Route path="/mural" element={<ProtectedRoute><MuralAluno /></ProtectedRoute>} />
+        <Route path="/mural/:alunoId" element={<ProtectedRoute><MuralAluno /></ProtectedRoute>} />
         <Route path="/alunos" element={<ProtectedRoute><Alunos /></ProtectedRoute>} />
         <Route path="/funcionarios" element={<ProtectedRoute><Funcionarios /></ProtectedRoute>} />
         <Route path="/academic" element={<ProtectedRoute><Academic /></ProtectedRoute>} />
