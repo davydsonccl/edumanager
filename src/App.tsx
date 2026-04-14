@@ -48,7 +48,12 @@ import {
   FileCheck,
   Palette,
   Sun,
-  Moon
+  Moon,
+  ArrowRight,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Lock
 } from 'lucide-react';
 
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -253,6 +258,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           {hasAccess('Financeiro') && <SidebarItem to="/financeiro" icon={DollarSign} label="Financeiro" active={location.pathname === '/financeiro'} />}
           {hasAccess('Comunicação') && <SidebarItem to="/comunicacao" icon={MessageSquare} label="Comunicação" active={location.pathname === '/comunicacao'} />}
           {hasAccess('Secretaria') && <SidebarItem to="/secretaria" icon={FileText} label="Secretaria" active={location.pathname === '/secretaria'} />}
+          {hasAccess('Relatórios') && <SidebarItem to="/relatorios" icon={BarChartIcon} label="Relatórios" active={location.pathname === '/relatorios'} />}
           {hasAccess('Transferências') && <SidebarItem to="/transferencias" icon={ArrowRightLeft} label="Transferências" active={location.pathname === '/transferencias'} />}
           {hasAccess('Acesso') && <SidebarItem to="/controle-acesso" icon={ShieldCheck} label="Acesso" active={location.pathname === '/controle-acesso'} />}
           {hasAccess('Configurações') && <SidebarItem to="/configuracoes" icon={SettingsIcon} label="Configurações" active={location.pathname === '/configuracoes'} />}
@@ -295,7 +301,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
 // --- Pages ---
 
-const Login = () => {
+const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
   const [email, setEmail] = useState('admin@admin.com');
   const [senha, setSenha] = useState('123');
   const [novaSenha, setNovaSenha] = useState('');
@@ -313,14 +319,16 @@ const Login = () => {
         localStorage.setItem('tempToken', res.data.token);
         localStorage.setItem('tempUser', JSON.stringify(res.data.user));
         setMustChangePassword(true);
+        addToast('Primeiro acesso detectado. Por favor, altere sua senha.', 'info');
       } else {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         localStorage.setItem('activeEmpresaId', res.data.user.empresa_id.toString());
+        addToast('Bem-vindo ao sistema!', 'success');
         navigate('/dashboard');
       }
     } catch (err) {
-      alert('Credenciais inválidas');
+      addToast('Credenciais inválidas ou erro no servidor', 'error');
     } finally {
       setLoading(false);
     }
@@ -329,11 +337,11 @@ const Login = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (novaSenha !== confirmarSenha) {
-      alert('As senhas não coincidem');
+      addToast('As senhas não coincidem', 'error');
       return;
     }
     if (novaSenha.length < 6) {
-      alert('A senha deve ter pelo menos 6 caracteres');
+      addToast('A senha deve ter pelo menos 6 caracteres', 'error');
       return;
     }
     setLoading(true);
@@ -348,90 +356,118 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.removeItem('tempToken');
       localStorage.removeItem('tempUser');
-      alert('Senha alterada com sucesso!');
+      addToast('Senha alterada com sucesso!', 'success');
       navigate('/dashboard');
     } catch (err) {
-      alert('Erro ao alterar senha');
+      addToast('Erro ao alterar senha', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-100/50 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-100/50 rounded-full blur-3xl animate-pulse" />
+      
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-slate-200 overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white overflow-hidden relative z-10"
       >
-        <div className="p-10">
-          <div className="flex justify-center mb-8">
-            <div className="bg-indigo-600 p-4 rounded-2xl shadow-lg shadow-indigo-200">
-              <School className="text-white" size={40} />
+        <div className="p-12">
+          <div className="flex justify-center mb-10">
+            <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-5 rounded-3xl shadow-xl shadow-indigo-200 transform hover:rotate-6 transition-transform">
+              <School className="text-white" size={44} />
             </div>
           </div>
           
           {!mustChangePassword ? (
             <>
-              <h2 className="text-3xl font-bold text-center text-slate-800 mb-2">Bem-vindo</h2>
-              <p className="text-slate-500 text-center mb-10">Acesse o sistema da sua escola</p>
+              <div className="text-center mb-10">
+                <h2 className="text-4xl font-black text-slate-800 tracking-tight mb-3">EduManager</h2>
+                <p className="text-slate-500 font-medium">Gestão escolar inteligente e simplificada</p>
+              </div>
 
               <form onSubmit={handleLogin} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">E-mail</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                    placeholder="exemplo@escola.com"
-                    required
-                  />
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Institucional</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                      placeholder="seu@email.com"
+                      required
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Senha</label>
-                  <input
-                    type="password"
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                    placeholder="••••••••"
-                    required
-                  />
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Senha de Acesso</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                      type="password"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
                 </div>
+                
+                <div className="flex justify-end">
+                  <button type="button" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+                    Esqueceu sua senha?
+                  </button>
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                 >
-                  {loading ? 'Entrando...' : 'Entrar no Sistema'}
+                  {loading ? (
+                    <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      Entrar no Sistema
+                      <ArrowRight size={20} />
+                    </>
+                  )}
                 </button>
               </form>
             </>
           ) : (
             <>
-              <h2 className="text-3xl font-bold text-center text-slate-800 mb-2">Primeiro Acesso</h2>
-              <p className="text-slate-500 text-center mb-10">Por segurança, você deve alterar sua senha temporária.</p>
+              <div className="text-center mb-10">
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3">Nova Senha</h2>
+                <p className="text-slate-500 font-medium">Defina sua senha definitiva para continuar</p>
+              </div>
 
               <form onSubmit={handleChangePassword} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Nova Senha</label>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nova Senha</label>
                   <input
                     type="password"
                     value={novaSenha}
                     onChange={(e) => setNovaSenha(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
                     placeholder="Mínimo 6 caracteres"
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Confirmar Nova Senha</label>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Confirmar Senha</label>
                   <input
                     type="password"
                     value={confirmarSenha}
                     onChange={(e) => setConfirmarSenha(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
                     placeholder="Repita a nova senha"
                     required
                   />
@@ -439,21 +475,52 @@ const Login = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-200 hover:bg-emerald-700 active:scale-[0.98] transition-all disabled:opacity-50"
                 >
-                  {loading ? 'Alterando...' : 'Confirmar Nova Senha'}
+                  {loading ? 'Processando...' : 'Confirmar e Acessar'}
                 </button>
               </form>
             </>
           )}
         </div>
-        <div className="bg-slate-50 p-6 text-center border-t border-slate-100">
-          <p className="text-sm text-slate-500">EduManager SaaS &copy; 2026</p>
+        <div className="bg-slate-50/50 p-8 text-center border-t border-slate-100">
+          <p className="text-sm text-slate-400 font-medium">
+            &copy; {new Date().getFullYear()} EduManager. Todos os direitos reservados.
+          </p>
         </div>
       </motion.div>
     </div>
   );
 };
+
+const ToastContainer = ({ toasts, onRemove }: { toasts: any[], onRemove: (id: number) => void }) => (
+  <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3">
+    <AnimatePresence>
+      {toasts.map(toast => (
+        <motion.div
+          key={toast.id}
+          initial={{ opacity: 0, x: 50, scale: 0.9 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: 20, scale: 0.9 }}
+          className={cn(
+            "px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[300px] border",
+            toast.type === 'success' ? "bg-emerald-600 text-white border-emerald-500" :
+            toast.type === 'error' ? "bg-red-600 text-white border-red-500" :
+            "bg-slate-800 text-white border-slate-700"
+          )}
+        >
+          {toast.type === 'success' && <CheckCircle size={20} />}
+          {toast.type === 'error' && <AlertCircle size={20} />}
+          {toast.type === 'info' && <Info size={20} />}
+          <p className="font-bold text-sm flex-1">{toast.message}</p>
+          <button onClick={() => onRemove(toast.id)} className="text-white/60 hover:text-white">
+            <X size={16} />
+          </button>
+        </motion.div>
+      ))}
+    </AnimatePresence>
+  </div>
+);
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ alunos: 0, financeiro: 0, turmas: 0, inadimplencia: 0 });
@@ -2040,7 +2107,15 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
             id="printable-document"
           >
             {/* Header */}
-            <div className="text-center border-b-2 border-slate-800 pb-8 mb-8">
+            <div className="text-center border-b-2 border-slate-800 pb-8 mb-8 flex flex-col items-center">
+              {empresa.logo_url && (
+                <img 
+                  src={empresa.logo_url} 
+                  alt="Logo" 
+                  className="h-24 mb-4 object-contain" 
+                  referrerPolicy="no-referrer"
+                />
+              )}
               <h1 className="text-2xl font-bold uppercase">{empresa.nome || 'Escola EduManager'}</h1>
               <p className="text-sm">{empresa.endereco || 'Endereço não informado'}</p>
               <p className="text-sm">CNPJ: {empresa.cnpj || '00.000.000/0001-00'} | Tel: {empresa.telefone || '---'}</p>
@@ -2065,6 +2140,26 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                     <div className="mt-20 border-t border-slate-800 w-64 mx-auto pt-2">
                       <p className="font-bold">{secretario || empresa.secretario || 'Secretaria Acadêmica'}</p>
                       <p className="text-xs uppercase">Secretário(a)</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {type === "Declaração Escolar" && (
+                <div className="space-y-6 text-justify leading-relaxed">
+                  <p>
+                    A Instituição de Ensino <strong>{empresa.nome}</strong>, por meio de sua Secretaria Escolar, declara que o(a) aluno(a) 
+                    <strong> {aluno.nome}</strong>, portador(a) do CPF nº <strong>{aluno.cpf}</strong>, 
+                    está devidamente matriculado(a) e frequentando as aulas do {aluno.turma_nome || '---'} no ano letivo de {new Date().getFullYear()}.
+                  </p>
+                  <p>
+                    Esta declaração é válida para fins de comprovação de escolaridade junto a órgãos públicos e privados.
+                  </p>
+                  <div className="pt-20 text-center">
+                    <p>{empresa.endereco?.split(',')[0] || 'Cidade'}, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    <div className="mt-20 border-t border-slate-800 w-64 mx-auto pt-2">
+                      <p className="font-bold">{diretor || empresa.diretor || 'Direção Escolar'}</p>
+                      <p className="text-xs uppercase">Diretor(a)</p>
                     </div>
                   </div>
                 </div>
@@ -2319,6 +2414,238 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
   );
 };
 
+const Relatorios = () => {
+  const [activeSubTab, setActiveSubTab] = useState('alunos');
+  const [alunos, setAlunos] = useState<any[]>([]);
+  const [financeiro, setFinanceiro] = useState<any[]>([]);
+  const [turmas, setTurmas] = useState<any[]>([]);
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [aluRes, finRes, turRes] = await Promise.all([
+          api.get('/alunos'),
+          api.get('/financeiro'),
+          api.get('/turmas')
+        ]);
+        setAlunos(aluRes.data);
+        setFinanceiro(finRes.data);
+        setTurmas(turRes.data);
+      } catch (err) {
+        console.error('Erro ao buscar dados para relatórios:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const filteredAlunos = alunos.filter(a => {
+    // Filter by school year (ano letivo) of the student's turma
+    if (filterYear) {
+      const turma = turmas.find(t => t.id === a.turma_id);
+      if (!turma || turma.ano_letivo?.toString() !== filterYear) return false;
+    }
+
+    // Filter by date range (intervalo) based on registration date (data_matricula)
+    if (startDate || endDate) {
+      if (!a.data_matricula) return false;
+      const regDate = new Date(a.data_matricula);
+      if (startDate && regDate < new Date(startDate)) return false;
+      if (endDate && regDate > new Date(endDate)) return false;
+    }
+
+    return true;
+  });
+
+  const inadimplentes = financeiro.filter(f => {
+    if (f.status !== 'pendente') return false;
+    const vencimento = new Date(f.vencimento || f.data_vencimento);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return vencimento < hoje;
+  });
+
+  const printReport = (title: string, contentId: string) => {
+    const printContent = document.getElementById(contentId);
+    if (!printContent) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f2f2f2; }
+            h1 { text-align: center; font-size: 18px; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Relatório: ${title}</h1>
+            <p>Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+          </div>
+          ${printContent.innerHTML}
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="space-y-8">
+      <header className="flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-bold text-slate-800 tracking-tight">Relatórios</h1>
+          <p className="text-slate-500 mt-1">Extração de dados e indicadores do sistema.</p>
+        </div>
+      </header>
+
+      <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveSubTab('alunos')}
+          className={cn(
+            "px-8 py-3 rounded-xl text-sm font-bold transition-all",
+            activeSubTab === 'alunos' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:bg-white/50"
+          )}
+        >
+          Relatório de Alunos
+        </button>
+        <button
+          onClick={() => setActiveSubTab('inadimplencia')}
+          className={cn(
+            "px-8 py-3 rounded-xl text-sm font-bold transition-all",
+            activeSubTab === 'inadimplencia' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:bg-white/50"
+          )}
+        >
+          Inadimplência
+        </button>
+      </div>
+
+      {activeSubTab === 'alunos' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Ano Letivo</label>
+              <input 
+                type="number" 
+                placeholder="Ex: 2024" 
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Data Inicial (Matrícula)</label>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Data Final (Matrícula)</label>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <button 
+              onClick={() => printReport('Relatório de Alunos', 'report-alunos')}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all"
+            >
+              <Printer size={18} />
+              Imprimir
+            </button>
+          </div>
+
+          <div id="report-alunos" className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Nome</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Nascimento</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Turma</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Responsável</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filteredAlunos.map(a => (
+                  <tr key={a.id}>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{new Date(a.data_nascimento).toLocaleDateString('pt-BR')}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{a.turma_nome || '---'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{a.responsavel_legal || a.nome_mae || '---'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'inadimplencia' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">Alunos com Mensalidades em Atraso</h3>
+              <p className="text-sm text-slate-500">Total de {inadimplentes.length} registros pendentes.</p>
+            </div>
+            <button 
+              onClick={() => printReport('Relatório de Inadimplência', 'report-inadimplencia')}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all"
+            >
+              <Printer size={18} />
+              Imprimir
+            </button>
+          </div>
+
+          <div id="report-inadimplencia" className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Vencimento</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Valor</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Dias de Atraso</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {inadimplentes.map(f => {
+                  const diasAtraso = Math.floor((new Date().getTime() - new Date(f.data_vencimento).getTime()) / (1000 * 3600 * 24));
+                  return (
+                    <tr key={f.id}>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-700">{f.aluno_nome}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{new Date(f.data_vencimento).toLocaleDateString('pt-BR')}</td>
+                      <td className="px-6 py-4 text-sm text-red-600 font-bold">R$ {f.valor.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{diasAtraso} dias</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DigitalSecretary = () => {
   const [searchParams] = useSearchParams();
   const initialAlunoId = searchParams.get('alunoId') || '';
@@ -2505,6 +2832,12 @@ const DigitalSecretary = () => {
               icon={FileText} 
               description="Gere declarações oficiais para alunos ativos." 
               onClick={() => handleGenerate("Declaração de Matrícula")}
+            />
+            <DocumentCard 
+              title="Declaração Escolar" 
+              icon={FileCheck} 
+              description="Declaração de escolaridade para diversos fins." 
+              onClick={() => handleGenerate("Declaração Escolar")}
             />
             {selectedAluno?.curso_tipo === 'infantil' ? (
               <DocumentCard 
@@ -2897,7 +3230,18 @@ const Alunos = () => {
     medicamentos_quais: '',
     turma_id: '',
     fileira: '',
-    assento: ''
+    assento: '',
+    matricula: '',
+    nis: '',
+    cor_raca: '',
+    deficiencia: false,
+    deficiencia_tipo: '',
+    nacionalidade: 'Brasileira',
+    certidao_nascimento: '',
+    pais_origem: 'Brasil',
+    municipio_nascimento: '',
+    zona_residencial: 'Urbana',
+    localizacao_diferenciada: 'Não se aplica'
   });
 
   const healthProblemsList = [
@@ -2965,7 +3309,10 @@ const Alunos = () => {
         problemas_saude_outros: '', uso_medicamentos: false, medicamentos_quais: '',
         turma_id: '', fileira: '', assento: '',
         whatsapp_pais_codigo: '+55', whatsapp_ddd: '', whatsapp_numero: '',
-        email_responsavel: ''
+        email_responsavel: '',
+        matricula: '', nis: '', cor_raca: '', deficiencia: false, deficiencia_tipo: '',
+        nacionalidade: 'Brasileira', certidao_nascimento: '', pais_origem: 'Brasil', municipio_nascimento: '',
+        zona_residencial: 'Urbana', localizacao_diferenciada: 'Não se aplica'
       });
       fetchAlunos();
     } catch (err: any) {
@@ -3286,6 +3633,12 @@ const Alunos = () => {
                 >
                   Saúde
                 </button>
+                <button 
+                  onClick={() => setActiveFormTab('educacenso')}
+                  className={cn("px-8 py-4 font-bold text-sm transition-all border-b-2", activeFormTab === 'educacenso' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500")}
+                >
+                  Educacenso
+                </button>
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
@@ -3316,15 +3669,27 @@ const Alunos = () => {
                           />
                         </label>
                       </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Nome Completo</label>
-                        <input
-                          type="text"
-                          value={formData.nome || ''}
-                          onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                          required
-                        />
+                      <div className="flex-1 space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">Matrícula</label>
+                          <input
+                            type="text"
+                            value={formData.matricula || ''}
+                            onChange={(e) => setFormData({ ...formData, matricula: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            placeholder="Gerado automaticamente"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">Nome Completo</label>
+                          <input
+                            type="text"
+                            value={formData.nome || ''}
+                            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
                     <div>
@@ -3413,6 +3778,119 @@ const Alunos = () => {
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="1, 2, 3..."
                       />
+                    </div>
+                  </div>
+                )}
+
+                {activeFormTab === 'educacenso' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">NIS (PIS/PASEP)</label>
+                      <input
+                        type="text"
+                        value={formData.nis || ''}
+                        onChange={(e) => setFormData({ ...formData, nis: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Cor / Raça</label>
+                      <select
+                        value={formData.cor_raca || ''}
+                        onChange={(e) => setFormData({ ...formData, cor_raca: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                      >
+                        <option value="">Selecione</option>
+                        <option value="Branca">Branca</option>
+                        <option value="Preta">Preta</option>
+                        <option value="Parda">Parda</option>
+                        <option value="Amarela">Amarela</option>
+                        <option value="Indígena">Indígena</option>
+                        <option value="Não declarado">Não declarado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Certidão de Nascimento</label>
+                      <input
+                        type="text"
+                        value={formData.certidao_nascimento || ''}
+                        onChange={(e) => setFormData({ ...formData, certidao_nascimento: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Termo, Livro, Folha..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Nacionalidade</label>
+                      <input
+                        type="text"
+                        value={formData.nacionalidade || ''}
+                        onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">País de Origem</label>
+                      <input
+                        type="text"
+                        value={formData.pais_origem || ''}
+                        onChange={(e) => setFormData({ ...formData, pais_origem: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Município de Nascimento</label>
+                      <input
+                        type="text"
+                        value={formData.municipio_nascimento || ''}
+                        onChange={(e) => setFormData({ ...formData, municipio_nascimento: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Zona Residencial</label>
+                      <select
+                        value={formData.zona_residencial || ''}
+                        onChange={(e) => setFormData({ ...formData, zona_residencial: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                      >
+                        <option value="Urbana">Urbana</option>
+                        <option value="Rural">Rural</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3 pt-8">
+                      <input
+                        type="checkbox"
+                        id="deficiencia"
+                        checked={formData.deficiencia || false}
+                        onChange={(e) => setFormData({ ...formData, deficiencia: e.target.checked })}
+                        className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                      />
+                      <label htmlFor="deficiencia" className="text-sm font-bold text-slate-700">Possui Deficiência / TGD / Altas Habilidades</label>
+                    </div>
+                    {formData.deficiencia && (
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Deficiência</label>
+                        <input
+                          type="text"
+                          value={formData.deficiencia_tipo || ''}
+                          onChange={(e) => setFormData({ ...formData, deficiencia_tipo: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          placeholder="Ex: Autismo, Deficiência Visual..."
+                        />
+                      </div>
+                    )}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Localização Diferenciada</label>
+                      <select
+                        value={formData.localizacao_diferenciada || ''}
+                        onChange={(e) => setFormData({ ...formData, localizacao_diferenciada: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                      >
+                        <option value="Não se aplica">Não se aplica</option>
+                        <option value="Área de assentamento">Área de assentamento</option>
+                        <option value="Terra indígena">Terra indígena</option>
+                        <option value="Área remanescente de quilombo">Área remanescente de quilombo</option>
+                      </select>
                     </div>
                   </div>
                 )}
@@ -4323,7 +4801,7 @@ const Funcionarios = () => {
   );
 };
 
-const ControleAcesso = () => {
+const ControleAcesso = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
@@ -4331,6 +4809,8 @@ const ControleAcesso = () => {
   const [alunos, setAlunos] = useState<any[]>([]);
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [tempPassword, setTempPassword] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -4400,7 +4880,9 @@ const ControleAcesso = () => {
     { id: 'Financeiro', label: 'Gestão Financeira' },
     { id: 'Comunicação', label: 'Comunicação / Mural' },
     { id: 'Secretaria', label: 'Secretaria Digital' },
+    { id: 'Transferências', label: 'Gestão de Transferências' },
     { id: 'Acesso', label: 'Controle de Acesso' },
+    { id: 'Relatórios', label: 'Relatórios' },
     { id: 'Configurações', label: 'Configurações do Sistema' }
   ];
 
@@ -4426,17 +4908,23 @@ const ControleAcesso = () => {
   }, [selectedUser]);
 
   const handleResetPassword = async () => {
-    if (!selectedUser) return;
-    const novaSenha = prompt('Digite a nova senha temporária:');
-    if (!novaSenha) return;
+    if (!selectedUser || !newPassword) {
+      addToast('Digite uma nova senha', 'error');
+      return;
+    }
+    setLoading(true);
     try {
       await api.post('/usuarios/reset-password', {
         usuario_id: selectedUser.id,
-        nova_senha: novaSenha
+        nova_senha: newPassword
       });
-      alert('Senha resetada com sucesso! O usuário deverá alterá-la no próximo acesso.');
+      addToast('Senha resetada com sucesso! O usuário deverá alterá-la no próximo acesso.', 'success');
+      setShowResetModal(false);
+      setNewPassword('');
     } catch (err) {
-      alert('Erro ao resetar senha');
+      addToast('Erro ao resetar senha', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -4684,6 +5172,44 @@ const ControleAcesso = () => {
       </div>
 
       <AnimatePresence>
+        {showResetModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 className="font-bold text-slate-800">Resetar Senha: {selectedRecord?.nome}</h3>
+                <button onClick={() => setShowResetModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-slate-500">Digite uma nova senha temporária para o usuário. Ele será obrigado a alterá-la no próximo login.</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Nova Senha Temporária</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+                <button
+                  onClick={handleResetPassword}
+                  disabled={loading || newPassword.length < 6}
+                  className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Processando...' : 'Confirmar Reset de Senha'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {showModal && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
@@ -4760,7 +5286,7 @@ const ControleAcesso = () => {
                         </button>
                       </div>
                       <button
-                        onClick={handleResetPassword}
+                        onClick={() => setShowResetModal(true)}
                         className="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all flex items-center gap-2"
                       >
                         <Key size={14} />
@@ -4879,9 +5405,14 @@ const ProfessorPortal = () => {
   const [frequenciaData, setFrequenciaData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('lancamento');
+  const [showFreqMap, setShowFreqMap] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [monthlyFreq, setMonthlyFreq] = useState<any[]>([]);
   const [historicoNotas, setHistoricoNotas] = useState<any[]>([]);
   const [historicoFreq, setHistoricoFreq] = useState<any[]>([]);
   const [professorVinculos, setProfessorVinculos] = useState<any[]>([]);
+  const [statsFreq, setStatsFreq] = useState<any>({});
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = user.perfil === 'admin';
   const isProfessor = user.perfil === 'professor';
@@ -4914,6 +5445,22 @@ const ProfessorPortal = () => {
     fetchData();
   }, []);
 
+  const fetchMonthlyFreq = async () => {
+    if (!turmaId || !disciplinaId) return;
+    try {
+      const res = await api.get(`/frequencia-mensal/${turmaId}/${disciplinaId}/${selectedMonth}/${selectedYear}`);
+      setMonthlyFreq(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (showFreqMap) {
+      fetchMonthlyFreq();
+    }
+  }, [showFreqMap, turmaId, disciplinaId, selectedMonth, selectedYear]);
+
   const fetchHistorico = async () => {
     if (!turmaId || !disciplinaId) return;
     setLoading(true);
@@ -4938,20 +5485,117 @@ const ProfessorPortal = () => {
   }, [activeTab, turmaId, disciplinaId, bimestre, dataFreq]);
 
   useEffect(() => {
+    if (turmaId && disciplinaId && dataFreq) {
+      api.get(`/frequencia-turma/${turmaId}/${disciplinaId}/${dataFreq}`)
+        .then(res => {
+          const freqMap: any = {};
+          res.data.forEach((f: any) => {
+            freqMap[f.aluno_id] = f.status;
+          });
+          // Merge with current state to avoid overwriting unsaved changes if needed, 
+          // but usually we want to load what's in the DB for that date.
+          setFrequenciaData(prev => ({ ...prev, ...freqMap }));
+        })
+        .catch(console.error);
+    }
+  }, [turmaId, disciplinaId, dataFreq]);
+
+  useEffect(() => {
     if (turmaId) {
-      const initialFreq: any = {};
       const initialNotas: any = {};
       alunos.filter(a => a.turma_id === parseInt(turmaId)).forEach(a => {
-        initialFreq[a.id] = 'P';
         initialNotas[a.id] = { valor: '', conceito: '', observacao: '' };
       });
-      setFrequenciaData(initialFreq);
       setNotasColetivas(initialNotas);
     } else {
-      setFrequenciaData({});
       setNotasColetivas({});
     }
   }, [turmaId, alunos]);
+
+  const saveTimeoutRef = useRef<any>(null);
+
+  const fetchStats = async () => {
+    if (!turmaId || !disciplinaId) return;
+    try {
+      const res = await api.get(`/frequencia-stats/${turmaId}/${disciplinaId}`);
+      setStatsFreq(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar estatísticas de frequência:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, [turmaId, disciplinaId]);
+
+  const saveFrequencia = async (data: any) => {
+    if (!turmaId || !disciplinaId) return;
+    
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const frequencias = Object.entries(data).map(([id, status]) => ({
+          aluno_id: parseInt(id),
+          status,
+          justificativa: ''
+        }));
+
+        await api.post('/frequencia-coletiva', { 
+          turma_id: parseInt(turmaId),
+          disciplina_id: parseInt(disciplinaId),
+          data: dataFreq,
+          frequencias
+        });
+        fetchStats();
+      } catch (err) {
+        console.error('Erro ao salvar frequência automaticamente:', err);
+      }
+    }, 500); // Debounce of 500ms
+  };
+
+  const handleFrequenciaChange = (alunoId: number, status: string) => {
+    const oldStatus = frequenciaData[alunoId];
+    const newFreq = { ...frequenciaData, [alunoId]: status };
+    setFrequenciaData(newFreq);
+    
+    // Update local stats for immediate feedback
+    const currentStats = statsFreq[alunoId] || { presencas: 0, ausencias: 0, justificadas: 0, total: 0 };
+    let newPresencas = currentStats.presencas || 0;
+    let newAusencias = currentStats.ausencias || 0;
+    let newJustificadas = currentStats.justificadas || 0;
+    let newTotal = currentStats.total || 0;
+
+    if (!oldStatus && status) {
+      newTotal++;
+    } else if (oldStatus && !status) {
+      newTotal--;
+    }
+
+    if (oldStatus === 'P') newPresencas--;
+    else if (oldStatus === 'F') newAusencias--;
+    else if (oldStatus === 'FJ') newJustificadas--;
+
+    if (status === 'P') newPresencas++;
+    else if (status === 'F') newAusencias++;
+    else if (status === 'FJ') newJustificadas++;
+
+    const newPerc = newTotal > 0 ? ((newPresencas + newJustificadas) / newTotal) * 100 : 100;
+
+    setStatsFreq({
+      ...statsFreq,
+      [alunoId]: {
+        ...currentStats,
+        presencas: newPresencas,
+        ausencias: newAusencias,
+        justificadas: newJustificadas,
+        total: newTotal,
+        percentual: newPerc.toFixed(1)
+      }
+    });
+
+    saveFrequencia(newFreq);
+  };
 
   const handleLancarNotasColetivas = async () => {
     if (!turmaId || !disciplinaId) {
@@ -5052,6 +5696,16 @@ const ProfessorPortal = () => {
         </div>
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100">
           <button
+            onClick={() => setShowFreqMap(!showFreqMap)}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
+              showFreqMap ? "bg-indigo-50 text-indigo-600" : "text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            <Calendar size={18} />
+            Mapa de Frequência
+          </button>
+          <button
             onClick={() => setActiveTab('lancamento')}
             className={cn(
               "px-6 py-2.5 rounded-xl text-sm font-bold transition-all",
@@ -5073,7 +5727,111 @@ const ProfessorPortal = () => {
       </header>
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {showFreqMap ? (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold text-slate-800">Mapa de Frequência Mensal</h2>
+                <div className="flex items-center gap-2">
+                  <select 
+                    value={selectedMonth} 
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {new Date(2000, i).toLocaleString('pt-BR', { month: 'long' })}
+                      </option>
+                    ))}
+                  </select>
+                  <select 
+                    value={selectedYear} 
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {[2023, 2024, 2025, 2026].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <button onClick={() => setShowFreqMap(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 font-bold text-slate-400 uppercase sticky left-0 bg-slate-50 z-10">Aluno</th>
+                    {Array.from({ length: 31 }, (_, i) => (
+                      <th key={i} className="px-2 py-3 font-bold text-slate-400 text-center w-8 border-l border-slate-100">{i + 1}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredAlunos.map(a => (
+                    <tr key={a.id} className="hover:bg-slate-50/50">
+                      <td className="px-4 py-3 font-medium text-slate-700 sticky left-0 bg-white z-10 border-r border-slate-100">{a.nome}</td>
+                      {Array.from({ length: 31 }, (_, i) => {
+                        const day = (i + 1).toString().padStart(2, '0');
+                        const dateStr = `${selectedYear}-${selectedMonth.padStart(2, '0')}-${day}`;
+                        const freq = monthlyFreq.find(f => f.aluno_id === a.id && f.data === dateStr);
+                        return (
+                          <td 
+                            key={i} 
+                            className="px-2 py-3 text-center border-l border-slate-100 cursor-pointer hover:bg-indigo-50 transition-colors"
+                            onClick={() => {
+                              const statuses = ['', 'P', 'F', 'FJ'];
+                              const currentStatus = freq?.status || '';
+                              const currentIndex = statuses.indexOf(currentStatus);
+                              const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+                              
+                              // Create a temporary frequenciaData object to use handleFrequenciaChange logic
+                              // but we need to handle the date as well.
+                              // For the map, we might need a direct API call or a more complex state update.
+                              // Let's implement a direct save for the map interaction.
+                              const updateFreq = async () => {
+                                try {
+                                  await api.post('/frequencia-coletiva', {
+                                    turma_id: parseInt(turmaId),
+                                    disciplina_id: parseInt(disciplinaId),
+                                    data: dateStr,
+                                    frequencias: [{ aluno_id: a.id, status: nextStatus }]
+                                  });
+                                  fetchMonthlyFreq();
+                                  // Also update stats if it's the current dateFreq
+                                  if (dateStr === dataFreq) {
+                                    fetchStats();
+                                  }
+                                } catch (err) {
+                                  console.error('Erro ao atualizar frequência no mapa:', err);
+                                }
+                              };
+                              updateFreq();
+                            }}
+                          >
+                            {freq ? (
+                              <span className={cn(
+                                "w-6 h-6 rounded flex items-center justify-center font-bold text-[10px]",
+                                freq.status === 'P' ? "bg-emerald-100 text-emerald-700" :
+                                freq.status === 'F' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                              )}>
+                                {freq.status}
+                              </span>
+                            ) : (
+                              <span className="text-slate-200">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Turma</label>
             <select
@@ -5204,45 +5962,72 @@ const ProfessorPortal = () => {
                     <ClipboardCheck className="text-indigo-600" size={24} />
                     Diário de Classe (Frequência)
                   </h2>
-                  <button
-                    onClick={handleLancarFrequenciaColetiva}
-                    disabled={loading || filteredAlunos.length === 0}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
-                  >
-                    {loading ? 'Salvando...' : 'Salvar Frequência'}
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-slate-400 italic">Salvamento automático habilitado</span>
+                    <button
+                      onClick={() => saveFrequencia(frequenciaData)}
+                      disabled={loading || filteredAlunos.length === 0}
+                      className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50"
+                    >
+                      {loading ? 'Salvando...' : 'Forçar Salvamento'}
+                    </button>
+                  </div>
                 </div>
                 <div className="border border-slate-100 rounded-2xl overflow-hidden">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50">
                       <tr>
+                        <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase text-center w-12">Nº</th>
+                        <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase w-32">Matrícula</th>
                         <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Aluno</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Frequência ({new Date(dataFreq + 'T12:00:00').toLocaleDateString('pt-BR')})</th>
+                        <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase text-center">P</th>
+                        <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase text-center">F</th>
+                        <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase text-center">% Freq</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredAlunos.map(a => (
-                        <tr key={a.id}>
+                      {filteredAlunos.map((a, idx) => (
+                        <tr key={a.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-4 py-4 text-center text-xs font-bold text-slate-400">{idx + 1}</td>
+                          <td className="px-4 py-4 text-xs font-mono text-slate-500">{a.matricula || '---'}</td>
                           <td className="px-6 py-4 text-sm font-medium text-slate-700">{a.nome}</td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex justify-center gap-2">
-                              {['P', 'F', 'FJ'].map((status) => (
-                                <button
-                                  key={status}
-                                  onClick={() => setFrequenciaData({ ...frequenciaData, [a.id]: status })}
-                                  className={cn(
-                                    "w-8 h-8 rounded-lg text-[10px] font-bold transition-all border",
-                                    (frequenciaData[a.id] || 'P') === status
-                                      ? status === 'P' ? "bg-emerald-600 text-white border-emerald-600" :
-                                        status === 'F' ? "bg-red-600 text-white border-red-600" :
-                                        "bg-amber-500 text-white border-amber-500"
-                                      : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
-                                  )}
-                                >
-                                  {status}
-                                </button>
-                              ))}
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[10px] text-slate-400 font-bold uppercase">
+                                {new Date(dataFreq + 'T12:00:00').toLocaleDateString('pt-BR')}
+                              </span>
+                              <select
+                                value={frequenciaData[a.id] || ''}
+                                onChange={(e) => handleFrequenciaChange(a.id, e.target.value)}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl font-bold text-sm outline-none transition-all border-2 w-full max-w-[160px]",
+                                  frequenciaData[a.id] === 'P' ? "bg-emerald-50 border-emerald-500 text-emerald-700" :
+                                  frequenciaData[a.id] === 'F' ? "bg-red-50 border-red-500 text-red-700" :
+                                  frequenciaData[a.id] === 'FJ' ? "bg-amber-50 border-amber-500 text-amber-700" :
+                                  "bg-slate-50 border-slate-200 text-slate-400"
+                                )}
+                              >
+                                <option value="">Selecionar</option>
+                                <option value="P">P</option>
+                                <option value="F">F</option>
+                                <option value="FJ">FJ</option>
+                              </select>
                             </div>
+                          </td>
+                          <td className="px-4 py-4 text-center text-sm font-bold text-emerald-600">
+                            {statsFreq[a.id]?.presencas || 0}
+                          </td>
+                          <td className="px-4 py-4 text-center text-sm font-bold text-red-600">
+                            {statsFreq[a.id]?.ausencias || 0}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <span className={cn(
+                              "px-3 py-1 rounded-full text-[10px] font-bold",
+                              parseFloat(statsFreq[a.id]?.percentual || '100') >= 75 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                            )}>
+                              {statsFreq[a.id]?.percentual || '100'}%
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -5410,6 +6195,8 @@ const ProfessorPortal = () => {
           <div className="p-20 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-3xl">
             Selecione uma turma e uma disciplina para carregar o diário.
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
@@ -6397,6 +7184,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
+  const [toasts, setToasts] = useState<any[]>([]);
+
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
+
   useEffect(() => {
     // Initialize database
     api.post('/init-db').catch(console.error);
@@ -6404,9 +7201,11 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+        <ToastContainer toasts={toasts} onRemove={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
+        <Routes>
+          <Route path="/login" element={<Login addToast={addToast} />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/escolas" element={<ProtectedRoute><Escolas /></ProtectedRoute>} />
         <Route path="/mural" element={<ProtectedRoute><MuralAluno /></ProtectedRoute>} />
         <Route path="/mural/:alunoId" element={<ProtectedRoute><MuralAluno /></ProtectedRoute>} />
@@ -6418,12 +7217,14 @@ export default function App() {
         <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
         <Route path="/comunicacao" element={<ProtectedRoute><Communication /></ProtectedRoute>} />
         <Route path="/secretaria" element={<ProtectedRoute><DigitalSecretary /></ProtectedRoute>} />
+        <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
         <Route path="/transferencias" element={<ProtectedRoute><Transferencias /></ProtectedRoute>} />
-        <Route path="/controle-acesso" element={<ProtectedRoute><ControleAcesso /></ProtectedRoute>} />
+        <Route path="/controle-acesso" element={<ProtectedRoute><ControleAcesso addToast={addToast} /></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/boletim/:alunoId" element={<ProtectedRoute><Boletim /></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
+      </div>
     </BrowserRouter>
   );
 }

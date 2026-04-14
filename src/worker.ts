@@ -191,7 +191,18 @@ CREATE TABLE IF NOT EXISTS alunos (
   status TEXT DEFAULT 'ativo',
   posicao_sala INTEGER,
   fileira INTEGER,
-  assento INTEGER
+  assento INTEGER,
+  matricula TEXT,
+  nis TEXT,
+  cor_raca TEXT,
+  deficiencia INTEGER DEFAULT 0,
+  deficiencia_tipo TEXT,
+  nacionalidade TEXT,
+  certidao_nascimento TEXT,
+  pais_origem TEXT,
+  municipio_nascimento TEXT,
+  zona_residencial TEXT,
+  localizacao_diferenciada TEXT
 );
 CREATE TABLE IF NOT EXISTS transferencias (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -358,7 +369,17 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       "ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER",
       "ALTER TABLE usuarios ADD COLUMN super_admin INTEGER DEFAULT 0",
       "ALTER TABLE empresas ADD COLUMN cor_primaria TEXT DEFAULT '#4f46e5'",
-      "ALTER TABLE empresas ADD COLUMN tema TEXT DEFAULT 'light'"
+      "ALTER TABLE empresas ADD COLUMN tema TEXT DEFAULT 'light'",
+      "ALTER TABLE alunos ADD COLUMN matricula TEXT",
+      "ALTER TABLE alunos ADD COLUMN nis TEXT",
+      "ALTER TABLE alunos ADD COLUMN cor_raca TEXT",
+      "ALTER TABLE alunos ADD COLUMN deficiencia INTEGER DEFAULT 0",
+      "ALTER TABLE alunos ADD COLUMN deficiencia_tipo TEXT",
+      "ALTER TABLE alunos ADD COLUMN nacionalidade TEXT",
+      "ALTER TABLE alunos ADD COLUMN pais_origem TEXT",
+      "ALTER TABLE alunos ADD COLUMN municipio_nascimento TEXT",
+      "ALTER TABLE alunos ADD COLUMN zona_residencial TEXT",
+      "ALTER TABLE alunos ADD COLUMN localizacao_diferenciada TEXT"
     ];
 
     for (const m of migrations) {
@@ -586,10 +607,11 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const rows = await db.prepare(`
-        SELECT a.*, t.nome as turma_nome, c.tipo as curso_tipo
+        SELECT a.*, t.nome as turma_nome, c.tipo as curso_tipo, m.data_matricula
         FROM alunos a
         LEFT JOIN turmas t ON a.turma_id = t.id
         LEFT JOIN cursos c ON t.curso_id = c.id
+        LEFT JOIN matriculas m ON a.id = m.aluno_id AND a.turma_id = m.turma_id
         WHERE a.empresa_id = ?
       `).all(c.get('user').empresa_id);
       return c.json(rows);
@@ -843,6 +865,12 @@ app.get('/api/health', async (c) => {
         if (transfer.tipo === 'interna' && transfer.escola_destino_id) {
           await db.prepare("UPDATE alunos SET empresa_id = ?, turma_id = NULL WHERE id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
           await db.prepare("UPDATE usuarios SET empresa_id = ?, turma_id = NULL WHERE aluno_id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
+          
+          // Move academic data to the new school
+          await db.prepare("UPDATE frequencias SET empresa_id = ? WHERE aluno_id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
+          await db.prepare("UPDATE notas SET empresa_id = ? WHERE aluno_id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
+          await db.prepare("UPDATE matriculas SET empresa_id = ? WHERE aluno_id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
+          await db.prepare("UPDATE financeiro SET empresa_id = ? WHERE aluno_id = ?").run(transfer.escola_destino_id, transfer.aluno_id);
         } else if (transfer.tipo === 'externa') {
           await db.prepare("UPDATE alunos SET status = 'transferido' WHERE id = ?").run(transfer.aluno_id);
         }
@@ -956,6 +984,36 @@ app.get('/api/health', async (c) => {
       if (currentAluno && currentAluno.turma_id !== turma_id) {
         await db.prepare("INSERT INTO historico_remanejamentos (empresa_id, aluno_id, turma_anterior_id, turma_nova_id, data_remanejamento, motivo) VALUES (?, ?, ?, ?, ?, ?)")
           .run(c.get('user').empresa_id, c.req.param('id'), currentAluno.turma_id, turma_id, new Date().toISOString(), motivo_remanejamento || 'Remanejamento de turma');
+        
+        if (turma_id) {
+          // Carry over academic data (grades and attendance) matching by discipline name
+          const newTurma = await db.prepare("SELECT curso_id FROM turmas WHERE id = ?").get(turma_id) as any;
+          if (newTurma) {
+            const newDisciplinas = await db.prepare("SELECT id, nome FROM disciplinas WHERE curso_id = ?").all(newTurma.curso_id) as any[];
+            for (const d of newDisciplinas) {
+              // Update grades
+              await db.prepare(`
+                UPDATE notas 
+                SET turma_id = ?, disciplina_id = ? 
+                WHERE aluno_id = ? AND disciplina_id IN (
+                  SELECT id FROM disciplinas WHERE UPPER(TRIM(nome)) = UPPER(TRIM(?))
+                )
+              `).run(turma_id, d.id, c.req.param('id'), d.nome);
+
+              // Update attendance
+              await db.prepare(`
+                UPDATE frequencias 
+                SET turma_id = ?, disciplina_id = ? 
+                WHERE aluno_id = ? AND disciplina_id IN (
+                  SELECT id FROM disciplinas WHERE UPPER(TRIM(nome)) = UPPER(TRIM(?))
+                )
+              `).run(turma_id, d.id, c.req.param('id'), d.nome);
+            }
+          }
+          
+          // Also update the current matricula to the new turma
+          await db.prepare("UPDATE matriculas SET turma_id = ? WHERE aluno_id = ? AND empresa_id = ?").run(turma_id, c.req.param('id'), c.get('user').empresa_id);
+        }
       }
 
       await db.prepare(`
@@ -1183,26 +1241,69 @@ app.get('/api/health', async (c) => {
       return c.json({ id: result.lastInsertRowid });
     });
 
+    app.get('/api/frequencia-stats/:turmaId/:disciplinaId', auth, async (c) => {
+      const { turmaId, disciplinaId } = c.req.param();
+      const db = new DBWrapper(c.env.DB);
+      const user = c.get('user');
+      const empresa_id = user.empresa_id;
+      
+      console.log(`Fetching stats for turma ${turmaId}, disciplina ${disciplinaId}, empresa ${empresa_id}`);
+      
+      const stats = await db.prepare(`
+        SELECT 
+          aluno_id,
+          COUNT(CASE WHEN status = 'P' THEN 1 END) as presencas,
+          COUNT(CASE WHEN status = 'FJ' THEN 1 END) as justificadas,
+          COUNT(CASE WHEN status = 'F' THEN 1 END) as ausencias,
+          COUNT(*) as total
+        FROM frequencias
+        WHERE turma_id = ? AND disciplina_id = ? AND empresa_id = ?
+        GROUP BY aluno_id
+      `).all(toInt(turmaId), toInt(disciplinaId), empresa_id);
+      
+      const statsMap: any = {};
+      if (Array.isArray(stats)) {
+        stats.forEach((s: any) => {
+          const perc = s.total > 0 ? ((s.presencas + s.justificadas) / s.total) * 100 : 100;
+          statsMap[s.aluno_id] = {
+            presencas: s.presencas,
+            ausencias: s.ausencias,
+            justificadas: s.justificadas,
+            percentual: perc.toFixed(1)
+          };
+        });
+      }
+      
+      return c.json(statsMap);
+    });
+
     app.post('/api/frequencia-coletiva', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const { turma_id, disciplina_id, data, frequencias } = await c.req.json();
+      const empresa_id = c.get('user').empresa_id;
+      
+      console.log(`Saving collective frequency for turma ${turma_id}, disciplina ${disciplina_id}, date ${data}`);
       
       for (const freq of frequencias) {
+        const aluno_id = toInt(freq.aluno_id);
+        const disc_id = toInt(disciplina_id);
+        const t_id = toInt(turma_id);
+
         const existing = await db.prepare(`
           SELECT id FROM frequencias 
           WHERE aluno_id = ? AND disciplina_id = ? AND data = ? AND empresa_id = ?
-        `).get(freq.aluno_id, disciplina_id, data, c.get('user').empresa_id) as any;
+        `).get(aluno_id, disc_id, data, empresa_id) as any;
 
         if (existing) {
           await db.prepare(`
             UPDATE frequencias SET status = ?, justificativa = ? 
             WHERE id = ?
-          `).run(freq.status, freq.justificativa, existing.id);
+          `).run(freq.status, freq.justificativa || '', existing.id);
         } else {
           await db.prepare(`
             INSERT INTO frequencias (aluno_id, disciplina_id, turma_id, data, status, justificativa, empresa_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(freq.aluno_id, disciplina_id, turma_id, data, freq.status, freq.justificativa, c.get('user').empresa_id);
+          `).run(aluno_id, disc_id, t_id, data, freq.status, freq.justificativa || '', empresa_id);
         }
       }
       return c.json({ success: true });
@@ -1236,6 +1337,23 @@ app.get('/api/health', async (c) => {
         SELECT * FROM frequencias 
         WHERE turma_id = ? AND disciplina_id = ? AND data = ? AND empresa_id = ?
       `).all(c.req.param('turmaId'), c.req.param('disciplinaId'), c.req.param('data'), c.get('user').empresa_id);
+      return c.json(rows);
+    });
+
+    app.get('/api/frequencia-mensal/:turmaId/:disciplinaId/:mes/:ano', auth, async (c) => {
+      const { turmaId, disciplinaId, mes, ano } = c.req.param();
+      const db = new DBWrapper(c.env.DB);
+      const empresa_id = c.get('user').empresa_id;
+      
+      const startDate = `${ano}-${mes.padStart(2, '0')}-01`;
+      const endDate = `${ano}-${mes.padStart(2, '0')}-31`; // Simplified, SQLite handles date strings well
+      
+      const rows = await db.prepare(`
+        SELECT * FROM frequencias 
+        WHERE turma_id = ? AND disciplina_id = ? AND empresa_id = ?
+        AND data BETWEEN ? AND ?
+      `).all(toInt(turmaId), toInt(disciplinaId), empresa_id, startDate, endDate);
+      
       return c.json(rows);
     });
 
