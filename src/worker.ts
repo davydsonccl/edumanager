@@ -379,7 +379,8 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       "ALTER TABLE alunos ADD COLUMN pais_origem TEXT",
       "ALTER TABLE alunos ADD COLUMN municipio_nascimento TEXT",
       "ALTER TABLE alunos ADD COLUMN zona_residencial TEXT",
-      "ALTER TABLE alunos ADD COLUMN localizacao_diferenciada TEXT"
+      "ALTER TABLE alunos ADD COLUMN localizacao_diferenciada TEXT",
+      "CREATE TABLE IF NOT EXISTS professor_vinculos (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, funcionario_id INTEGER, disciplina_id INTEGER, turma_id INTEGER)"
     ];
 
     for (const m of migrations) {
@@ -910,6 +911,16 @@ app.get('/api/health', async (c) => {
 
     app.get('/api/professor-vinculos/:funcionarioId', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
+      
+      // Garantir que a tabela existe (safety check)
+      await db.exec(`CREATE TABLE IF NOT EXISTS professor_vinculos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empresa_id INTEGER,
+        funcionario_id INTEGER,
+        disciplina_id INTEGER,
+        turma_id INTEGER
+      )`);
+
       const rows = await db.prepare("SELECT * FROM professor_vinculos WHERE funcionario_id = ? AND empresa_id = ?").all(c.req.param('funcionarioId'), c.get('user').empresa_id);
       return c.json(rows);
     });
@@ -917,6 +928,15 @@ app.get('/api/health', async (c) => {
     app.post('/api/professor-vinculos', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const { funcionario_id, vinculos } = await c.req.json();
+      
+      // Garantir que a tabela existe (safety check)
+      await db.exec(`CREATE TABLE IF NOT EXISTS professor_vinculos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empresa_id INTEGER,
+        funcionario_id INTEGER,
+        disciplina_id INTEGER,
+        turma_id INTEGER
+      )`);
       
       await db.prepare("DELETE FROM professor_vinculos WHERE funcionario_id = ? AND empresa_id = ?").run(funcionario_id, c.get('user').empresa_id);
       
