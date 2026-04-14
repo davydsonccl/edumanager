@@ -488,12 +488,28 @@ app.get('/api/health', async (c) => {
     });
 
     app.post('/api/usuarios/reset-password', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
       const user = c.get('user');
       if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      
       const { usuario_id, nova_senha } = await c.req.json();
+      const targetId = toInt(usuario_id);
+      
+      if (!targetId) return c.json({ error: 'ID de usuário inválido' }, 400);
+      if (!nova_senha || nova_senha.length < 6) return c.json({ error: 'Senha muito curta' }, 400);
+      
       const hash = bcrypt.hashSync(nova_senha, 10);
-      await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, usuario_id);
+      
+      // If not super_admin, ensure the user belongs to the same company
+      let query = "UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?";
+      let params: any[] = [hash, targetId];
+      
+      if (!user.super_admin) {
+        query += " AND empresa_id = ?";
+        params.push(user.empresa_id);
+      }
+      
+      await db.prepare(query).run(...params);
       return c.json({ success: true });
     });
 
@@ -1180,6 +1196,12 @@ app.get('/api/health', async (c) => {
         WHERE id = ?
       `).run(nome, cnpj, endereco, telefone, email, diretor, secretario, msg_cobranca_whatsapp, msg_cobranca_email, c.get('user').empresa_id);
       return c.json({ success: true });
+    });
+
+    app.get('/api/matriculas', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const rows = await db.prepare("SELECT * FROM matriculas WHERE empresa_id = ?").all(c.get('user').empresa_id);
+      return c.json(rows);
     });
 
     // Pedagogical Endpoints

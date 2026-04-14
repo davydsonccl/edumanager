@@ -539,16 +539,17 @@ const Dashboard = () => {
         const res = await api.get(`/portal-aluno/${user.aluno_id}`);
         setAlunoData(res.data);
       } else {
-        const [alunosRes, financeiroRes, turmasRes] = await Promise.all([
+        const [alunosRes, financeiroRes, turmasRes, matriculasRes] = await Promise.all([
           api.get('/alunos'),
           api.get('/financeiro'),
-          api.get('/turmas')
+          api.get('/turmas'),
+          api.get('/matriculas')
         ]);
         
         setAlunos(alunosRes.data);
         setTurmas(turmasRes.data);
 
-        const totalFinanceiro = financeiroRes.data.reduce((acc: number, curr: any) => acc + curr.valor, 0);
+        const totalFinanceiro = financeiroRes.data.reduce((acc: number, curr: any) => acc + (curr.valor || 0), 0);
         const inadimplentes = financeiroRes.data.filter((f: any) => f.status === 'pendente' || f.status === 'atrasado').length;
 
         setStats({
@@ -558,14 +559,25 @@ const Dashboard = () => {
           inadimplencia: inadimplentes
         });
 
-        setChartData([
-          { name: 'Jan', matriculas: 45, financeiro: 12000 },
-          { name: 'Fev', matriculas: 52, financeiro: 15000 },
-          { name: 'Mar', matriculas: 48, financeiro: 14000 },
-          { name: 'Abr', matriculas: 61, financeiro: 18000 },
-          { name: 'Mai', matriculas: 55, financeiro: 16500 },
-          { name: 'Jun', matriculas: 67, financeiro: 21000 },
-        ]);
+        // Processamento de dados para os gráficos
+        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const currentYear = new Date().getFullYear();
+        
+        const dynamicChartData = months.map((month, index) => {
+          const monthMatriculas = matriculasRes.data.filter((m: any) => {
+            const d = new Date(m.data_matricula);
+            return d.getMonth() === index && d.getFullYear() === currentYear;
+          }).length;
+          
+          const monthFinanceiro = financeiroRes.data.filter((f: any) => {
+            const d = new Date(f.vencimento);
+            return d.getMonth() === index && d.getFullYear() === currentYear && f.status === 'pago';
+          }).reduce((acc: number, curr: any) => acc + (curr.valor || 0), 0);
+
+          return { name: month, matriculas: monthMatriculas, financeiro: monthFinanceiro };
+        });
+
+        setChartData(dynamicChartData);
       }
     } catch (err) {
       console.error(err);
@@ -661,8 +673,8 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {alunoData.notas.map((n: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                  {alunoData.notas.map((n: any) => (
+                    <tr key={n.id || `nota-${n.disciplina}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 font-semibold text-slate-700">{n.disciplina}</td>
                       <td className="px-6 py-4 text-center font-bold text-indigo-600">{(n.media || 0).toFixed(1)}</td>
                       <td className="px-6 py-4 text-center">
@@ -697,8 +709,8 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {alunoData.financeiro.map((f: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                  {alunoData.financeiro.map((f: any) => (
+                    <tr key={f.id || `fin-${f.vencimento}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-600">{new Date(f.vencimento).toLocaleDateString('pt-BR')}</td>
                       <td className="px-6 py-4 font-bold text-slate-800">R$ {(f.valor || 0).toFixed(2)}</td>
                       <td className="px-6 py-4">
@@ -868,10 +880,10 @@ const Dashboard = () => {
               <BarChartIcon size={20} className="text-indigo-600" />
               Crescimento de Matrículas
             </h2>
-            <select className="bg-slate-50 border-none text-xs font-bold text-slate-500 rounded-lg px-3 py-2 outline-none">
-              <option>Últimos 6 meses</option>
-              <option>Este ano</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-indigo-600" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Matrículas</span>
+            </div>
           </div>
           <div className="h-[300px] w-full">
             {chartData.length > 0 && (
@@ -899,9 +911,13 @@ const Dashboard = () => {
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <PieChartIcon size={20} className="text-emerald-600" />
-              Saúde Financeira
+              <DollarSign size={20} className="text-emerald-600" />
+              Receita por Mês
             </h2>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Receita (R$)</span>
+            </div>
           </div>
           <div className="h-[300px] w-full">
             {chartData.length > 0 && (
@@ -911,6 +927,7 @@ const Dashboard = () => {
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
                   <Tooltip 
+                    cursor={{fill: '#f8fafc'}}
                     contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
                   />
                   <Bar dataKey="financeiro" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
@@ -1617,8 +1634,8 @@ const MuralAluno = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {data.notas.map((n: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                  {data.notas.map((n: any) => (
+                    <tr key={n.id || `nota-${n.disciplina}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-6 font-bold text-slate-700">{n.disciplina}</td>
                       <td className="px-8 py-6 text-center font-mono font-bold text-indigo-600">{(n.media || 0).toFixed(1)}</td>
                       <td className="px-8 py-6 text-center">
@@ -1662,8 +1679,8 @@ const MuralAluno = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {data.financeiro.map((f: any, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                    {data.financeiro.map((f: any) => (
+                      <tr key={f.id || `fin-${f.vencimento}`} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-8 py-6 text-slate-600">{new Date(f.vencimento).toLocaleDateString('pt-BR')}</td>
                         <td className="px-8 py-6 font-bold text-slate-800">R$ {(f.valor || 0).toFixed(2)}</td>
                         <td className="px-8 py-6">
@@ -2026,8 +2043,8 @@ const Communication = () => {
               <p className="text-slate-500 text-sm mb-6">Alunos que leram: {showStats.titulo}</p>
               <div className="max-h-96 overflow-y-auto space-y-3 custom-scrollbar pr-2">
                 {statsData.length === 0 && <p className="text-slate-400 italic text-center py-10">Ninguém leu este comunicado ainda.</p>}
-                {statsData.map((s, i) => (
-                  <div key={i} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50">
+                {statsData.map((s: any) => (
+                  <div key={s.id || `stat-${s.nome}`} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50">
                     <span className="font-bold text-slate-700">{s.nome}</span>
                     <span className="text-xs text-slate-400">{new Date(s.data_leitura).toLocaleString('pt-BR')}</span>
                   </div>
@@ -2183,8 +2200,8 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                         </tr>
                       </thead>
                       <tbody>
-                        {boletim.map((item, idx) => (
-                          <tr key={idx}>
+                        {boletim.map((item: any) => (
+                          <tr key={item.id || `boletim-table-${item.disciplina}`}>
                             <td className="border border-slate-300 p-2">{item.disciplina}</td>
                             <td className="border border-slate-300 p-2 text-center">{item.bimestre}º</td>
                             <td className="border border-slate-300 p-2 text-center font-mono font-bold">
@@ -2290,8 +2307,8 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                     <p><strong>Ano Letivo:</strong> {new Date().getFullYear()}</p>
                   </div>
                   <div className="space-y-8">
-                    {boletim.map((item, idx) => (
-                      <div key={idx} className="border border-slate-200 p-6 rounded-xl space-y-4">
+                    {boletim.map((item: any) => (
+                      <div key={item.id || `boletim-ficha-${item.disciplina}`} className="border border-slate-200 p-6 rounded-xl space-y-4">
                         <h3 className="font-bold text-indigo-700 border-b pb-2">{item.disciplina}</h3>
                         <div className="grid grid-cols-2 gap-4 text-xs">
                           <p><strong>Avaliação:</strong> {item.conceito || '---'}</p>
@@ -4912,17 +4929,20 @@ const ControleAcesso = ({ addToast }: { addToast: (m: string, t?: any) => void }
   }, [selectedUser]);
 
   const handleResetPassword = async () => {
-    if (!selectedUser || !newPassword) {
-      addToast('Digite uma nova senha', 'error');
+    const targetUserId = selectedUser?.id || selectedRecord?.usuario?.id;
+    
+    if (!targetUserId) {
+      addToast('Usuário não identificado para o reset', 'error');
       return;
     }
+    
+    if (!newPassword || newPassword.length < 6) {
+      addToast('A senha deve ter pelo menos 6 caracteres', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
-      const targetUserId = selectedUser?.id || selectedRecord?.usuario?.id;
-      if (!targetUserId) {
-        addToast('Usuário não identificado para o reset', 'error');
-        return;
-      }
       await api.post('/usuarios/reset-password', {
         usuario_id: targetUserId,
         nova_senha: newPassword
@@ -4930,8 +4950,9 @@ const ControleAcesso = ({ addToast }: { addToast: (m: string, t?: any) => void }
       addToast('Senha resetada com sucesso! O usuário deverá alterá-la no próximo acesso.', 'success');
       setShowResetModal(false);
       setNewPassword('');
-    } catch (err) {
-      addToast('Erro ao resetar senha', 'error');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || 'Erro ao resetar senha';
+      addToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -5772,7 +5793,7 @@ const ProfessorPortal = () => {
                   <tr>
                     <th className="px-4 py-3 font-bold text-slate-400 uppercase sticky left-0 bg-slate-50 z-10">Aluno</th>
                     {Array.from({ length: 31 }, (_, i) => (
-                      <th key={i} className="px-2 py-3 font-bold text-slate-400 text-center w-8 border-l border-slate-100">{i + 1}</th>
+                      <th key={`day-${i}`} className="px-2 py-3 font-bold text-slate-400 text-center w-8 border-l border-slate-100">{i + 1}</th>
                     ))}
                   </tr>
                 </thead>
@@ -5786,7 +5807,7 @@ const ProfessorPortal = () => {
                         const freq = monthlyFreq.find(f => f.aluno_id === a.id && f.data === dateStr);
                         return (
                           <td 
-                            key={i} 
+                            key={`cell-${a.id}-${i}`} 
                             className="px-2 py-3 text-center border-l border-slate-100 cursor-pointer hover:bg-indigo-50 transition-colors"
                             onClick={() => {
                               const statuses = ['', 'P', 'F', 'FJ'];
@@ -6522,8 +6543,8 @@ const Boletim = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {notas.map((n, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                {notas.map((n) => (
+                  <tr key={n.id || `boletim-nota-${n.disciplina}-${n.bimestre}`} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-semibold text-slate-700">{n.disciplina}</td>
                     <td className="px-6 py-4 text-center text-slate-500">{n.bimestre}º</td>
                     <td className="px-6 py-4 text-center">
@@ -6574,8 +6595,8 @@ const Boletim = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {frequencia.map((f, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
+                {frequencia.map((f) => (
+                  <tr key={f.id || `boletim-freq-${f.data}`} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 text-slate-600">{f.data}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
