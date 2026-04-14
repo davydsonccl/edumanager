@@ -168,7 +168,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const handleSwitchEmpresa = (id: string) => {
     localStorage.setItem('activeEmpresaId', id);
     setActiveEmpresaId(id);
-    window.location.reload(); // Reload to refresh all data with new empresa_id
+    window.location.href = '/'; // Use location.href to ensure a clean reload at the root
   };
 
   const isAdmin = user.perfil === 'admin';
@@ -2627,11 +2627,15 @@ const Relatorios = () => {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {inadimplentes.map(f => {
-                  const diasAtraso = Math.floor((new Date().getTime() - new Date(f.data_vencimento).getTime()) / (1000 * 3600 * 24));
+                  const vencimento = new Date(f.vencimento || f.data_vencimento);
+                  const hoje = new Date();
+                  hoje.setHours(0, 0, 0, 0);
+                  const diffTime = hoje.getTime() - vencimento.getTime();
+                  const diasAtraso = Math.max(0, Math.floor(diffTime / (1000 * 3600 * 24)));
                   return (
                     <tr key={f.id}>
                       <td className="px-6 py-4 text-sm font-medium text-slate-700">{f.aluno_nome}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500">{new Date(f.data_vencimento).toLocaleDateString('pt-BR')}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{vencimento.toLocaleDateString('pt-BR')}</td>
                       <td className="px-6 py-4 text-sm text-red-600 font-bold">R$ {f.valor.toFixed(2)}</td>
                       <td className="px-6 py-4 text-sm text-slate-500">{diasAtraso} dias</td>
                     </tr>
@@ -4914,8 +4918,13 @@ const ControleAcesso = ({ addToast }: { addToast: (m: string, t?: any) => void }
     }
     setLoading(true);
     try {
+      const targetUserId = selectedUser?.id || selectedRecord?.usuario?.id;
+      if (!targetUserId) {
+        addToast('Usuário não identificado para o reset', 'error');
+        return;
+      }
       await api.post('/usuarios/reset-password', {
-        usuario_id: selectedUser.id,
+        usuario_id: targetUserId,
         nova_senha: newPassword
       });
       addToast('Senha resetada com sucesso! O usuário deverá alterá-la no próximo acesso.', 'success');
