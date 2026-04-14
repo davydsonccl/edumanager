@@ -2043,8 +2043,8 @@ const Communication = () => {
               <p className="text-slate-500 text-sm mb-6">Alunos que leram: {showStats.titulo}</p>
               <div className="max-h-96 overflow-y-auto space-y-3 custom-scrollbar pr-2">
                 {statsData.length === 0 && <p className="text-slate-400 italic text-center py-10">Ninguém leu este comunicado ainda.</p>}
-                {statsData.map((s: any) => (
-                  <div key={s.id || `stat-${s.nome}`} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50">
+                {statsData.map((s: any, idx: number) => (
+                  <div key={s.id || `stat-${s.nome}-${idx}`} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50">
                     <span className="font-bold text-slate-700">{s.nome}</span>
                     <span className="text-xs text-slate-400">{new Date(s.data_leitura).toLocaleString('pt-BR')}</span>
                   </div>
@@ -2201,7 +2201,7 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                       </thead>
                       <tbody>
                         {boletim.map((item: any) => (
-                          <tr key={item.id || `boletim-table-${item.disciplina}`}>
+                          <tr key={item.id || `boletim-table-${item.disciplina}-${item.bimestre}`}>
                             <td className="border border-slate-300 p-2">{item.disciplina}</td>
                             <td className="border border-slate-300 p-2 text-center">{item.bimestre}º</td>
                             <td className="border border-slate-300 p-2 text-center font-mono font-bold">
@@ -2308,7 +2308,7 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                   </div>
                   <div className="space-y-8">
                     {boletim.map((item: any) => (
-                      <div key={item.id || `boletim-ficha-${item.disciplina}`} className="border border-slate-200 p-6 rounded-xl space-y-4">
+                      <div key={item.id || `boletim-ficha-${item.disciplina}-${item.bimestre}`} className="border border-slate-200 p-6 rounded-xl space-y-4">
                         <h3 className="font-bold text-indigo-700 border-b pb-2">{item.disciplina}</h3>
                         <div className="grid grid-cols-2 gap-4 text-xs">
                           <p><strong>Avaliação:</strong> {item.conceito || '---'}</p>
@@ -2353,7 +2353,7 @@ const DocumentModal = ({ type, aluno, empresa, onClose }: { type: string; aluno:
                     </thead>
                     <tbody>
                       {boletim.map((item, idx) => (
-                        <tr key={idx}>
+                        <tr key={item.id || `boletim-row-${idx}`}>
                           <td className="border border-slate-300 p-2">{item.disciplina}</td>
                           <td className="border border-slate-300 p-2 text-center">{item.carga_horaria || '80'}h</td>
                           <td className="border border-slate-300 p-2 text-center">{item.bimestre}º</td>
@@ -4656,7 +4656,7 @@ const Funcionarios = () => {
                     </div>
                     
                     {vinculos.map((v, idx) => (
-                      <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl relative">
+                      <div key={`vinculo-${idx}`} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl relative">
                         <button 
                           type="button"
                           onClick={() => setVinculos(vinculos.filter((_, i) => i !== idx))}

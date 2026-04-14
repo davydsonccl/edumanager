@@ -1514,7 +1514,7 @@ app.get('/api/health', async (c) => {
   const db = new DBWrapper(c.env.DB);
 
       const rows = await db.prepare(`
-        SELECT a.nome, cl.data_leitura 
+        SELECT cl.id, a.nome, cl.data_leitura 
         FROM comunicados_lidos cl
         JOIN alunos a ON cl.aluno_id = a.id
         WHERE cl.comunicado_id = ? AND cl.empresa_id = ?
