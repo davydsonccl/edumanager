@@ -81,7 +81,7 @@ const auth = async (c: any, next: any) => {
     
     // Support switching schools for super admins
     const requestedEmpresaId = c.req.header('x-empresa-id');
-    if (requestedEmpresaId && decoded.super_admin) {
+    if (requestedEmpresaId && requestedEmpresaId !== 'null' && requestedEmpresaId !== 'undefined' && decoded.super_admin) {
       const parsedId = parseInt(requestedEmpresaId);
       if (!isNaN(parsedId)) {
         decoded.empresa_id = parsedId;
@@ -604,7 +604,8 @@ app.get('/api/health', async (c) => {
 
     // Student Endpoints
     app.get('/api/alunos', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
+      const empresa_id = c.get('user').empresa_id;
 
       const rows = await db.prepare(`
         SELECT a.*, t.nome as turma_nome, c.tipo as curso_tipo, m.data_matricula
@@ -613,7 +614,7 @@ app.get('/api/health', async (c) => {
         LEFT JOIN cursos c ON t.curso_id = c.id
         LEFT JOIN matriculas m ON a.id = m.aluno_id AND a.turma_id = m.turma_id
         WHERE a.empresa_id = ?
-      `).all(c.get('user').empresa_id);
+      `).all(empresa_id || 0);
       return c.json(rows);
     });
 
@@ -739,7 +740,8 @@ app.get('/api/health', async (c) => {
     // Transfer Endpoints
     app.get('/api/empresas-rede', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      const rows = await db.prepare("SELECT id, nome FROM empresas WHERE id != ?").all(c.get('user').empresa_id);
+      const empresa_id = c.get('user').empresa_id;
+      const rows = await db.prepare("SELECT id, nome FROM empresas WHERE id != ?").all(empresa_id || 0);
       return c.json(rows);
     });
 

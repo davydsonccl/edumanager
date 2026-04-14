@@ -6623,18 +6623,20 @@ const Transferencias = () => {
 
   const fetchData = async () => {
     try {
+      // Fetch concurrently but handle errors individually if needed
       const [transRes, redeRes, alunosRes, escolaRes] = await Promise.all([
-        api.get('/transferencias'),
-        api.get('/empresas-rede'),
-        api.get('/alunos'),
-        api.get('/escola-atual')
+        api.get('/transferencias').catch(err => ({ data: [] })),
+        api.get('/empresas-rede').catch(err => ({ data: [] })),
+        api.get('/alunos').catch(err => ({ data: [] })),
+        api.get('/escola-atual').catch(err => ({ data: null }))
       ]);
-      setTransferencias(transRes.data);
-      setEmpresasRede(redeRes.data);
-      setAlunos(alunosRes.data);
+      
+      setTransferencias(Array.isArray(transRes.data) ? transRes.data : []);
+      setEmpresasRede(Array.isArray(redeRes.data) ? redeRes.data : []);
+      setAlunos(Array.isArray(alunosRes.data) ? alunosRes.data : []);
       setEscolaAtual(escolaRes.data);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao buscar dados de transferência:', err);
     }
   };
 
