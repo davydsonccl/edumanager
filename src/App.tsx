@@ -158,7 +158,17 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         .catch(() => setLoadingPerms(false));
       
       if (user.super_admin) {
-        api.get('/todas-empresas').then(res => setTodasEmpresas(res.data));
+        api.get('/todas-empresas')
+          .then(res => {
+            setTodasEmpresas(res.data || []);
+            // Se não houver empresa ativa, seleciona a primeira da lista
+            if (!activeEmpresaId && res.data && res.data.length > 0) {
+              const firstId = res.data[0].id.toString();
+              localStorage.setItem('activeEmpresaId', firstId);
+              setActiveEmpresaId(firstId);
+            }
+          })
+          .catch(err => console.error('Erro ao buscar todas as empresas:', err));
       }
     } else {
       setLoadingPerms(false);
@@ -231,18 +241,22 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </h1>
         </div>
 
-        {isSuperAdmin && todasEmpresas.length > 1 && (
-          <div className="mb-6 px-2">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Unidade Escolar</label>
-            <select 
-              value={activeEmpresaId}
-              onChange={(e) => handleSwitchEmpresa(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50"
-            >
-              {todasEmpresas.map(e => (
-                <option key={e.id} value={e.id}>{e.nome}</option>
-              ))}
-            </select>
+        {isSuperAdmin && (
+          <div className="mb-8 px-2">
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+              <label className="block text-[10px] font-bold text-amber-500 uppercase mb-3 tracking-widest">Unidade em Foco</label>
+              <select 
+                value={activeEmpresaId || ''}
+                onChange={(e) => handleSwitchEmpresa(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-700 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-amber-500 bg-slate-800 cursor-pointer hover:bg-slate-700 transition-colors"
+              >
+                <option value="" disabled>Selecionar Unidade</option>
+                {todasEmpresas.map(e => (
+                  <option key={e.id} value={e.id}>{e.nome}</option>
+                ))}
+                {todasEmpresas.length === 0 && <option disabled>Nenhuma escola cadastrada</option>}
+              </select>
+            </div>
           </div>
         )}
 
