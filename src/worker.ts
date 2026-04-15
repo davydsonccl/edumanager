@@ -136,7 +136,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
   perfil TEXT,
   super_admin INTEGER DEFAULT 0,
   primeiro_acesso INTEGER DEFAULT 1,
-  status TEXT DEFAULT 'ativo'
+  status TEXT DEFAULT 'ativo',
+  reset_token TEXT,
+  reset_token_expires DATETIME
 );
 CREATE TABLE IF NOT EXISTS cursos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -486,17 +488,61 @@ app.get('/api/health', async (c) => {
       const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
       if (!user) return c.json({ error: 'E-mail não encontrado' }, 404);
       
-      // Para este sistema, vamos resetar para uma senha temporária e retornar
-      const tempPassword = Math.random().toString(36).slice(-8);
-      const hash = bcrypt.hashSync(tempPassword, 10);
+      // Gerar código de 6 dígitos
+      const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutos
       
-      await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, user.id);
+      await db.prepare("UPDATE usuarios SET reset_token = ?, reset_token_expires = ? WHERE id = ?")
+        .run(resetCode, expires, user.id);
+      
+      // Simulação de envio de e-mail (em produção usaria um serviço de e-mail)
+      console.log(`[EMAIL] Código de recuperação para ${email}: ${resetCode}`);
       
       return c.json({ 
         success: true, 
-        message: 'Sua senha foi resetada temporariamente. Use a senha abaixo para acessar e alterá-la no primeiro acesso.',
-        tempPassword 
+        message: 'Um código de recuperação foi enviado para o seu e-mail cadastrado.',
+        // Retornamos o código apenas para fins de demonstração neste ambiente de preview
+        // Em produção, este campo NÃO existiria na resposta da API
+        debugCode: resetCode 
       });
+    });
+
+    app.post('/api/verify-reset-code', async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const { email, code } = await c.req.json();
+      
+      const user = await db.prepare("SELECT * FROM usuarios WHERE email = ? AND reset_token = ?").get(email, code) as any;
+      
+      if (!user) return c.json({ error: 'Código inválido ou e-mail incorreto' }, 400);
+      
+      const now = new Date().toISOString();
+      if (user.reset_token_expires < now) {
+        return c.json({ error: 'O código expirou. Solicite um novo.' }, 400);
+      }
+      
+      return c.json({ success: true, message: 'Código verificado com sucesso. Agora você pode definir uma nova senha.' });
+    });
+
+    app.post('/api/reset-password-with-code', async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const { email, code, novaSenha } = await c.req.json();
+      
+      const user = await db.prepare("SELECT * FROM usuarios WHERE email = ? AND reset_token = ?").get(email, code) as any;
+      
+      if (!user) return c.json({ error: 'Código inválido ou e-mail incorreto' }, 400);
+      
+      const now = new Date().toISOString();
+      if (user.reset_token_expires < now) {
+        return c.json({ error: 'O código expirou' }, 400);
+      }
+      
+      if (!novaSenha || novaSenha.length < 6) return c.json({ error: 'A nova senha deve ter pelo menos 6 caracteres' }, 400);
+      
+      const hash = bcrypt.hashSync(novaSenha, 10);
+      await db.prepare("UPDATE usuarios SET senha = ?, reset_token = NULL, reset_token_expires = NULL, primeiro_acesso = 0 WHERE id = ?")
+        .run(hash, user.id);
+      
+      return c.json({ success: true, message: 'Senha alterada com sucesso!' });
     });
 
     app.post('/api/change-password', auth, async (c) => {
