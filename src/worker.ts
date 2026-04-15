@@ -746,7 +746,12 @@ app.get('/api/health', async (c) => {
 
     app.post('/api/empresa', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      const { nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, cor_primaria, tema } = await c.req.json();
+      const data = await c.req.json();
+      const { 
+        nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, 
+        msg_cobranca_whatsapp, msg_cobranca_email, cor_primaria, tema,
+        smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from
+      } = data;
       
       // Only super_admin can change theme and primary color
       const currentUser = c.get('user');
@@ -760,9 +765,17 @@ app.get('/api/health', async (c) => {
           nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, 
           diretor = ?, secretario = ?, logo_url = ?, 
           msg_cobranca_whatsapp = ?, msg_cobranca_email = ?,
-          cor_primaria = ?, tema = ?
+          cor_primaria = ?, tema = ?,
+          smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?, smtp_from = ?
         WHERE id = ?
-      `).run(nome, cnpj, endereco, telefone, email, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, finalCor, finalTema, currentUser.empresa_id);
+      `).run(
+        nome, cnpj, endereco, telefone, email, 
+        diretor, secretario, logo_url, 
+        msg_cobranca_whatsapp, msg_cobranca_email, 
+        finalCor, finalTema,
+        smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from,
+        currentUser.empresa_id
+      );
       return c.json({ success: true });
     });
 
