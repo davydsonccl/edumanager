@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import nodemailer from 'nodemailer';
 
 const JWT_SECRET = 'SECRET_KEY_EDU_MANAGER';
 
@@ -500,15 +501,64 @@ app.get('/api/health', async (c) => {
       await db.prepare("UPDATE usuarios SET reset_token = ?, reset_token_expires = ? WHERE id = ?")
         .run(resetCode, expires, user.id);
       
-      // Simulação de envio de e-mail (em produção usaria um serviço de e-mail)
-      console.log(`[EMAIL] Código de recuperação para ${email}: ${resetCode}`);
+      // Buscar configurações de SMTP
+      let smtpConfig = null;
+      if (user.empresa_id) {
+        smtpConfig = await db.prepare("SELECT * FROM empresas WHERE id = ?").get(user.empresa_id) as any;
+      } else {
+        // Super admin ou usuário sem empresa - tenta pegar a primeira empresa com SMTP configurado
+        smtpConfig = await db.prepare("SELECT * FROM empresas WHERE smtp_host IS NOT NULL LIMIT 1").get() as any;
+      }
+
+      if (smtpConfig && smtpConfig.smtp_host) {
+        try {
+          const transporter = nodemailer.createTransport({
+            host: smtpConfig.smtp_host,
+            port: parseInt(smtpConfig.smtp_port),
+            secure: parseInt(smtpConfig.smtp_port) === 465,
+            auth: {
+              user: smtpConfig.smtp_user,
+              pass: smtpConfig.smtp_pass,
+            },
+          });
+
+          await transporter.sendMail({
+            from: smtpConfig.smtp_from || smtpConfig.email || 'noreply@edumanager.com',
+            to: email,
+            subject: 'Recuperação de Senha - EduManager',
+            text: `Seu código de recuperação é: ${resetCode}. Ele expira em 15 minutos.`,
+            html: `
+              <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px;">
+                <h2 style="color: #4f46e5; margin-bottom: 20px;">Recuperação de Senha</h2>
+                <p>Olá, <strong>${user.nome}</strong>.</p>
+                <p>Você solicitou a recuperação de senha para sua conta no sistema <strong>EduManager</strong>.</p>
+                <p>Utilize o código abaixo para validar sua identidade e definir uma nova senha:</p>
+                <div style="background: #f3f4f6; padding: 30px; border-radius: 16px; text-align: center; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #1f2937; margin: 30px 0; border: 2px dashed #d1d5db;">
+                  ${resetCode}
+                </div>
+                <p style="font-size: 14px; color: #6b7280; text-align: center;">Este código é válido por <strong>15 minutos</strong>.</p>
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                  <p style="font-size: 12px; color: #9ca3af; line-height: 1.5;">
+                    Se você não solicitou esta alteração, por favor ignore este e-mail. Por segurança, não compartilhe este código com ninguém.
+                  </p>
+                </div>
+              </div>
+            `
+          });
+          console.log(`[SMTP] E-mail de recuperação enviado para ${email}`);
+        } catch (emailErr: any) {
+          console.error('[SMTP Error] Falha ao enviar e-mail:', emailErr);
+          return c.json({ error: 'Erro ao enviar e-mail. Verifique as configurações de SMTP da escola.' }, 500);
+        }
+      } else {
+        // Fallback para log se não houver SMTP (apenas para debug em desenvolvimento)
+        console.warn(`[SMTP Warning] SMTP não configurado para ${email}. Código: ${resetCode}`);
+        return c.json({ error: 'O sistema de e-mail não está configurado. Entre em contato com o suporte.' }, 500);
+      }
       
       return c.json({ 
         success: true, 
-        message: 'Um código de recuperação foi enviado para o seu e-mail cadastrado.',
-        // Retornamos o código apenas para fins de demonstração neste ambiente de preview
-        // Em produção, este campo NÃO existiria na resposta da API
-        debugCode: resetCode 
+        message: 'Um código de recuperação foi enviado para o seu e-mail cadastrado.'
       });
     });
 
