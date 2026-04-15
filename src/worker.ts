@@ -389,6 +389,13 @@ CREATE TABLE IF NOT EXISTS solicitacoes_financeiras (
       "ALTER TABLE alunos ADD COLUMN municipio_nascimento TEXT",
       "ALTER TABLE alunos ADD COLUMN zona_residencial TEXT",
       "ALTER TABLE alunos ADD COLUMN localizacao_diferenciada TEXT",
+      "ALTER TABLE empresas ADD COLUMN smtp_host TEXT",
+      "ALTER TABLE empresas ADD COLUMN smtp_port INTEGER",
+      "ALTER TABLE empresas ADD COLUMN smtp_user TEXT",
+      "ALTER TABLE empresas ADD COLUMN smtp_pass TEXT",
+      "ALTER TABLE empresas ADD COLUMN smtp_from TEXT",
+      "ALTER TABLE usuarios ADD COLUMN reset_token TEXT",
+      "ALTER TABLE usuarios ADD COLUMN reset_token_expires DATETIME",
       "CREATE TABLE IF NOT EXISTS professor_vinculos (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, funcionario_id INTEGER, disciplina_id INTEGER, turma_id INTEGER)"
     ];
 
@@ -773,7 +780,7 @@ app.get('/api/health', async (c) => {
         diretor, secretario, logo_url, 
         msg_cobranca_whatsapp, msg_cobranca_email, 
         finalCor, finalTema,
-        smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from,
+        smtp_host, toInt(smtp_port), smtp_user, smtp_pass, smtp_from,
         currentUser.empresa_id
       );
       return c.json({ success: true });
