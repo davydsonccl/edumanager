@@ -4810,6 +4810,106 @@ const Funcionarios = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showVinculosModal && selectedProfessor && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowVinculosModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl p-10 overflow-y-auto max-h-[90vh] custom-scrollbar"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Vínculos do Professor</h2>
+                  <p className="text-slate-500 mt-1">{selectedProfessor.nome}</p>
+                </div>
+                <button onClick={() => setShowVinculosModal(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-8">
+                <h3 className="font-bold text-slate-700 mb-4">Adicionar Novo Vínculo</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Disciplina</label>
+                    <select
+                      value={newVinculo.disciplina_id}
+                      onChange={(e) => setNewVinculo({ ...newVinculo, disciplina_id: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="">Selecione...</option>
+                      {disciplinas.map(d => (
+                        <option key={d.id} value={d.id}>{d.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Turma/Sala</label>
+                    <select
+                      value={newVinculo.turma_id}
+                      onChange={(e) => setNewVinculo({ ...newVinculo, turma_id: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="">Selecione...</option>
+                      {turmas.map(t => (
+                        <option key={t.id} value={t.id}>{t.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddVinculo}
+                  className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus size={18} /> Inserir Vínculo
+                </button>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-slate-800 mb-4">Vínculos Atuais</h3>
+                {vinculos.length === 0 ? (
+                  <p className="text-slate-500 text-sm italic text-center py-8 bg-slate-50 rounded-2xl border border-slate-100">
+                    Nenhum vínculo cadastrado para este professor.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {vinculos.map((v) => {
+                      const disciplina = disciplinas.find(d => d.id === Number(v.disciplina_id));
+                      const turma = turmas.find(t => t.id === Number(v.turma_id));
+                      return (
+                        <div key={v.id} className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                          <div>
+                            <p className="font-bold text-slate-800">{disciplina?.nome || 'Disciplina Desconhecida'}</p>
+                            <p className="text-sm text-slate-500">{turma?.nome || 'Turma Desconhecida'}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveVinculo(v.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                            title="Remover Vínculo"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
