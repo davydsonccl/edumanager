@@ -4338,6 +4338,10 @@ const Funcionarios = () => {
   const [vinculos, setVinculos] = useState<any[]>([]);
   const [escolaAtual, setEscolaAtual] = useState<any>(null);
 
+  const [showVinculosModal, setShowVinculosModal] = useState(false);
+  const [selectedProfessor, setSelectedProfessor] = useState<any>(null);
+  const [newVinculo, setNewVinculo] = useState({ disciplina_id: '', turma_id: '' });
+
   const fetchData = async () => {
     const [fRes, dRes, tRes, eRes] = await Promise.all([
       api.get('/funcionarios'),
@@ -4355,6 +4359,44 @@ const Funcionarios = () => {
     fetchData();
   }, []);
 
+  const fetchVinculos = async (funcionarioId: number) => {
+    try {
+      const res = await api.get(`/professor-vinculos/${funcionarioId}`);
+      setVinculos(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar vínculos:', err);
+    }
+  };
+
+  const handleAddVinculo = async () => {
+    if (!newVinculo.disciplina_id || !newVinculo.turma_id) {
+      alert('Selecione a disciplina e a turma.');
+      return;
+    }
+    try {
+      await api.post('/professor-vinculos/add', {
+        funcionario_id: selectedProfessor.id,
+        disciplina_id: newVinculo.disciplina_id,
+        turma_id: newVinculo.turma_id
+      });
+      setNewVinculo({ disciplina_id: '', turma_id: '' });
+      fetchVinculos(selectedProfessor.id);
+    } catch (err: any) {
+      alert(`Erro ao adicionar vínculo: ${err.response?.data?.error || err.message}`);
+    }
+  };
+
+  const handleRemoveVinculo = async (id: number) => {
+    if (confirm('Deseja realmente remover este vínculo?')) {
+      try {
+        await api.delete(`/professor-vinculos/${id}`);
+        fetchVinculos(selectedProfessor.id);
+      } catch (err) {
+        alert('Erro ao remover vínculo');
+      }
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -4367,17 +4409,19 @@ const Funcionarios = () => {
         funcionarioId = res.data.id;
       }
 
-      if (formData.cargo?.includes('Professor')) {
-        await api.post('/professor-vinculos', {
-          funcionario_id: funcionarioId,
-          vinculos: vinculos
-        });
-      }
-
       setShowModal(false);
       setEditingItem(null);
       setFormData({});
       fetchData();
+
+      // Se for professor e for um novo cadastro, abre a tela de vínculos
+      if (!editingItem && formData.cargo?.includes('Professor')) {
+        const newProf = { ...formData, id: funcionarioId };
+        setSelectedProfessor(newProf);
+        setVinculos([]);
+        setShowVinculosModal(true);
+      }
+
     } catch (err: any) {
       console.error('Erro ao salvar funcionário:', err.response?.data || err.message);
       alert(`Erro ao salvar funcionário: ${err.response?.data?.error || err.message}`);
@@ -4547,6 +4591,19 @@ const Funcionarios = () => {
                     >
                       <Trash2 size={18} />
                     </button>
+                    {f.cargo?.includes('Professor') && (
+                      <button 
+                        onClick={() => {
+                          setSelectedProfessor(f);
+                          fetchVinculos(f.id);
+                          setShowVinculosModal(true);
+                        }}
+                        className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-all"
+                        title="Gerar Vínculos"
+                      >
+                        <BookOpen size={18} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -4642,71 +4699,6 @@ const Funcionarios = () => {
                     ))}
                   </select>
                 </div>
-                {formData.cargo?.includes('Professor') && (
-                  <div className="col-span-2 space-y-4 border-t border-slate-100 pt-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-bold text-slate-800">Vínculos de Disciplinas e Turmas</h3>
-                      <button 
-                        type="button"
-                        onClick={() => setVinculos([...vinculos, { disciplina_id: '', turma_id: '' }])}
-                        className="text-indigo-600 text-xs font-bold hover:underline flex items-center gap-1"
-                      >
-                        <Plus size={14} /> Adicionar Vínculo
-                      </button>
-                    </div>
-                    
-                    {vinculos.map((v, idx) => (
-                      <div key={`vinculo-${idx}`} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl relative">
-                        <button 
-                          type="button"
-                          onClick={() => setVinculos(vinculos.filter((_, i) => i !== idx))}
-                          className="absolute -top-2 -right-2 p-1 bg-white border border-slate-200 rounded-full text-red-500 hover:bg-red-50"
-                        >
-                          <X size={14} />
-                        </button>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Disciplina</label>
-                          <select
-                            value={v.disciplina_id}
-                            onChange={(e) => {
-                              const newVinculos = [...vinculos];
-                              newVinculos[idx].disciplina_id = e.target.value;
-                              setVinculos(newVinculos);
-                            }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
-                            required
-                          >
-                            <option value="">Selecione...</option>
-                            {disciplinas.map(d => (
-                              <option key={d.id} value={d.id}>{d.nome}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Turma/Sala</label>
-                          <select
-                            value={v.turma_id}
-                            onChange={(e) => {
-                              const newVinculos = [...vinculos];
-                              newVinculos[idx].turma_id = e.target.value;
-                              setVinculos(newVinculos);
-                            }}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-sm"
-                            required
-                          >
-                            <option value="">Selecione...</option>
-                            {turmas.map(t => (
-                              <option key={t.id} value={t.id}>{t.nome}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    ))}
-                    {vinculos.length === 0 && (
-                      <p className="text-center text-slate-400 text-xs italic py-4">Nenhum vínculo adicionado.</p>
-                    )}
-                  </div>
-                )}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Data de Admissão</label>
                   <input

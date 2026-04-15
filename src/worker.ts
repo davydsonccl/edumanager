@@ -925,6 +925,30 @@ app.get('/api/health', async (c) => {
       return c.json(rows);
     });
 
+    app.post('/api/professor-vinculos/add', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const { funcionario_id, disciplina_id, turma_id } = await c.req.json();
+      
+      await db.exec(`CREATE TABLE IF NOT EXISTS professor_vinculos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empresa_id INTEGER,
+        funcionario_id INTEGER,
+        disciplina_id INTEGER,
+        turma_id INTEGER
+      )`);
+
+      const result = await db.prepare("INSERT INTO professor_vinculos (empresa_id, funcionario_id, disciplina_id, turma_id) VALUES (?, ?, ?, ?)")
+        .run(c.get('user').empresa_id, funcionario_id, disciplina_id, turma_id);
+        
+      return c.json({ success: true, id: result.lastInsertRowid });
+    });
+
+    app.delete('/api/professor-vinculos/:id', auth, async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      await db.prepare("DELETE FROM professor_vinculos WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      return c.json({ success: true });
+    });
+
     app.post('/api/professor-vinculos', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const { funcionario_id, vinculos } = await c.req.json();
