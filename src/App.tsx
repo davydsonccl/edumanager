@@ -3496,6 +3496,64 @@ const Settings = () => {
 
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
           <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Mail size={20} className="text-indigo-600" />
+            Configurações de E-mail (SMTP)
+          </h2>
+          <p className="text-slate-500 text-sm mb-6">Configure o servidor SMTP para envio de e-mails de recuperação de senha e notificações.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Servidor SMTP (Host)</label>
+              <input 
+                type="text" 
+                value={empresa.smtp_host || ''} 
+                onChange={(e) => setEmpresa({...empresa, smtp_host: e.target.value})}
+                placeholder="smtp.exemplo.com"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Porta SMTP</label>
+              <input 
+                type="number" 
+                value={empresa.smtp_port || ''} 
+                onChange={(e) => setEmpresa({...empresa, smtp_port: e.target.value})}
+                placeholder="587"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">E-mail Remetente (From)</label>
+              <input 
+                type="email" 
+                value={empresa.smtp_from || ''} 
+                onChange={(e) => setEmpresa({...empresa, smtp_from: e.target.value})}
+                placeholder="nao-responda@escola.com"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Usuário SMTP</label>
+              <input 
+                type="text" 
+                value={empresa.smtp_user || ''} 
+                onChange={(e) => setEmpresa({...empresa, smtp_user: e.target.value})}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Senha SMTP</label>
+              <input 
+                type="password" 
+                value={empresa.smtp_pass || ''} 
+                onChange={(e) => setEmpresa({...empresa, smtp_pass: e.target.value})}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
             <SettingsIcon size={20} className="text-indigo-600" />
             Preferências do Sistema
           </h2>
