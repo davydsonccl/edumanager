@@ -88,17 +88,17 @@ function cn(...inputs: ClassValue[]) {
 
 // --- Components ---
 
-const SidebarItem = ({ to, icon: Icon, label, active }: { to: string; icon: any; label: string; active: boolean }) => (
+const SidebarItem = ({ to, icon: Icon, label, active, isSuperAdmin }: { to: string; icon: any; label: string; active: boolean; isSuperAdmin?: boolean }) => (
   <Link
     to={to}
     className={cn(
       "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
       active 
-        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" 
-        : "text-slate-600 hover:bg-slate-100 hover:text-indigo-600"
+        ? (isSuperAdmin ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "bg-indigo-600 text-white shadow-lg shadow-indigo-200") 
+        : (isSuperAdmin ? "text-slate-400 hover:bg-white/5 hover:text-white" : "text-slate-600 hover:bg-slate-100 hover:text-indigo-600")
     )}
   >
-    <Icon size={20} className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-slate-400 group-hover:text-indigo-600")} />
+    <Icon size={20} className={cn("transition-transform group-hover:scale-110", active ? "text-white" : (isSuperAdmin ? "text-slate-500 group-hover:text-amber-500" : "text-slate-400 group-hover:text-indigo-600"))} />
     <span className="font-medium">{label}</span>
   </Link>
 );
@@ -217,14 +217,18 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <aside className={cn(
-        "bg-white border-r border-slate-200 p-6 flex flex-col fixed h-full z-50 transition-transform duration-300 lg:translate-x-0 lg:w-72",
+        "border-r p-6 flex flex-col fixed h-full z-50 transition-transform duration-300 lg:translate-x-0 lg:w-72",
+        isSuperAdmin ? "bg-slate-900 border-slate-800 text-slate-300" : "bg-white border-slate-200 text-slate-900",
         sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full w-72"
       )}>
         <div className="hidden lg:flex items-center gap-3 mb-10 px-2">
-          <div className="bg-indigo-600 p-2 rounded-lg">
+          <div className={cn("p-2 rounded-lg", isSuperAdmin ? "bg-amber-500" : "bg-indigo-600")}>
             <School className="text-white" size={24} />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800">EduManager</h1>
+          <h1 className={cn("text-xl font-bold tracking-tight", isSuperAdmin ? "text-white" : "text-slate-800")}>
+            EduManager
+            {isSuperAdmin && <span className="block text-[10px] text-amber-500 font-black uppercase tracking-tighter">Master Admin</span>}
+          </h1>
         </div>
 
         {isSuperAdmin && todasEmpresas.length > 1 && (
@@ -243,40 +247,45 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         )}
 
         <nav className="flex flex-col gap-2 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-12 lg:mt-0">
-          {hasAccess('Painel') && <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Painel" active={location.pathname === '/dashboard'} />}
-          {isSuperAdmin && <SidebarItem to="/escolas" icon={School} label="Escolas" active={location.pathname === '/escolas'} />}
+          {hasAccess('Painel') && <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Painel" active={location.pathname === '/dashboard'} isSuperAdmin={isSuperAdmin} />}
+          {isSuperAdmin && <SidebarItem to="/escolas" icon={School} label="Escolas" active={location.pathname === '/escolas'} isSuperAdmin={isSuperAdmin} />}
           
           {hasAccess('Mural do Aluno') && !isAdmin && !isSuperAdmin && (
-            <SidebarItem to="/mural" icon={BookOpen} label="Mural do Aluno" active={location.pathname === '/mural'} />
+            <SidebarItem to="/mural" icon={BookOpen} label="Mural do Aluno" active={location.pathname === '/mural'} isSuperAdmin={isSuperAdmin} />
           )}
           
-          {hasAccess('Alunos') && <SidebarItem to="/alunos" icon={Users} label="Alunos" active={location.pathname === '/alunos'} />}
-          {hasAccess('Acadêmico') && <SidebarItem to="/academic" icon={BookOpen} label="Acadêmico" active={location.pathname === '/academic'} />}
-          {hasAccess('Professor') && <SidebarItem to="/professor" icon={GraduationCap} label="Professor" active={location.pathname === '/professor'} />}
-          {hasAccess('Mapa de Sala') && <SidebarItem to="/mapa-sala" icon={Map} label="Mapa de Sala" active={location.pathname === '/mapa-sala'} />}
-          {hasAccess('Funcionários') && <SidebarItem to="/funcionarios" icon={Briefcase} label="Funcionários" active={location.pathname === '/funcionarios'} />}
-          {hasAccess('Financeiro') && <SidebarItem to="/financeiro" icon={DollarSign} label="Financeiro" active={location.pathname === '/financeiro'} />}
-          {hasAccess('Comunicação') && <SidebarItem to="/comunicacao" icon={MessageSquare} label="Comunicação" active={location.pathname === '/comunicacao'} />}
-          {hasAccess('Secretaria') && <SidebarItem to="/secretaria" icon={FileText} label="Secretaria" active={location.pathname === '/secretaria'} />}
-          {hasAccess('Relatórios') && <SidebarItem to="/relatorios" icon={BarChartIcon} label="Relatórios" active={location.pathname === '/relatorios'} />}
-          {hasAccess('Transferências') && <SidebarItem to="/transferencias" icon={ArrowRightLeft} label="Transferências" active={location.pathname === '/transferencias'} />}
-          {hasAccess('Acesso') && <SidebarItem to="/controle-acesso" icon={ShieldCheck} label="Acesso" active={location.pathname === '/controle-acesso'} />}
-          {hasAccess('Configurações') && <SidebarItem to="/configuracoes" icon={SettingsIcon} label="Configurações" active={location.pathname === '/configuracoes'} />}
+          {hasAccess('Alunos') && <SidebarItem to="/alunos" icon={Users} label="Alunos" active={location.pathname === '/alunos'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Acadêmico') && <SidebarItem to="/academic" icon={BookOpen} label="Acadêmico" active={location.pathname === '/academic'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Professor') && <SidebarItem to="/professor" icon={GraduationCap} label="Professor" active={location.pathname === '/professor'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Mapa de Sala') && <SidebarItem to="/mapa-sala" icon={Map} label="Mapa de Sala" active={location.pathname === '/mapa-sala'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Funcionários') && <SidebarItem to="/funcionarios" icon={Briefcase} label="Funcionários" active={location.pathname === '/funcionarios'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Financeiro') && <SidebarItem to="/financeiro" icon={DollarSign} label="Financeiro" active={location.pathname === '/financeiro'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Comunicação') && <SidebarItem to="/comunicacao" icon={MessageSquare} label="Comunicação" active={location.pathname === '/comunicacao'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Secretaria') && <SidebarItem to="/secretaria" icon={FileText} label="Secretaria" active={location.pathname === '/secretaria'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Relatórios') && <SidebarItem to="/relatorios" icon={BarChartIcon} label="Relatórios" active={location.pathname === '/relatorios'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Transferências') && <SidebarItem to="/transferencias" icon={ArrowRightLeft} label="Transferências" active={location.pathname === '/transferencias'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Acesso') && <SidebarItem to="/controle-acesso" icon={ShieldCheck} label="Acesso" active={location.pathname === '/controle-acesso'} isSuperAdmin={isSuperAdmin} />}
+          {hasAccess('Configurações') && <SidebarItem to="/configuracoes" icon={SettingsIcon} label="Configurações" active={location.pathname === '/configuracoes'} isSuperAdmin={isSuperAdmin} />}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-100">
+        <div className="mt-auto pt-6 border-t border-slate-100/10">
           <div className="flex items-center gap-3 mb-6 px-2">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold", isSuperAdmin ? "bg-amber-500/20 text-amber-500" : "bg-indigo-100 text-indigo-700")}>
               {user.nome?.[0] || 'U'}
             </div>
             <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-semibold text-slate-800 truncate">{user.nome}</span>
-              <span className="text-xs text-slate-500 capitalize">{user.perfil}</span>
+              <span className={cn("text-sm font-semibold truncate", isSuperAdmin ? "text-white" : "text-slate-800")}>{user.nome}</span>
+              <span className={cn("text-xs capitalize", isSuperAdmin ? "text-amber-500 font-bold" : "text-slate-500")}>
+                {isSuperAdmin ? 'Administrador Master' : user.perfil}
+              </span>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors font-medium"
+            className={cn(
+              "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-colors font-medium",
+              isSuperAdmin ? "text-slate-400 hover:bg-white/5 hover:text-white" : "text-red-600 hover:bg-red-50"
+            )}
           >
             <LogOut size={20} />
             Sair
@@ -308,7 +317,25 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [tempPass, setTempPass] = useState('');
   const navigate = useNavigate();
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setTempPass('');
+    try {
+      const res = await api.post('/forgot-password', { email: forgotEmail });
+      addToast(res.data.message, 'success');
+      setTempPass(res.data.tempPassword);
+    } catch (err: any) {
+      addToast(err.response?.data?.error || 'Erro ao processar solicitação', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -384,64 +411,128 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
           </div>
           
           {!mustChangePassword ? (
-            <>
-              <div className="text-center mb-10">
-                <h2 className="text-4xl font-black text-slate-800 tracking-tight mb-3">EduManager</h2>
-                <p className="text-slate-500 font-medium">Gestão escolar inteligente e simplificada</p>
-              </div>
+            !showForgot ? (
+              <>
+                <div className="text-center mb-10">
+                  <h2 className="text-4xl font-black text-slate-800 tracking-tight mb-3">EduManager</h2>
+                  <p className="text-slate-500 font-medium">Gestão escolar inteligente e simplificada</p>
+                </div>
 
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Institucional</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
-                      placeholder="seu@email.com"
-                      required
-                    />
+                <form onSubmit={handleLogin} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Institucional</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                        placeholder="seu@email.com"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Senha de Acesso</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                    <input
-                      type="password"
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
-                      placeholder="••••••••"
-                      required
-                    />
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Senha de Acesso</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                      <input
+                        type="password"
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                        placeholder="••••••••"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex justify-end">
-                  <button type="button" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
-                    Esqueceu sua senha?
+                  
+                  <div className="flex justify-end">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowForgot(true)}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+                    >
+                      Esqueceu sua senha?
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {loading ? (
+                      <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        Entrar no Sistema
+                        <ArrowRight size={20} />
+                      </>
+                    )}
                   </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-10">
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3">Recuperar Senha</h2>
+                  <p className="text-slate-500 font-medium">Informe seu e-mail para receber uma senha temporária</p>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-                >
-                  {loading ? (
-                    <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      Entrar no Sistema
-                      <ArrowRight size={20} />
-                    </>
+                <form onSubmit={handleForgotPassword} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Institucional</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                      <input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                        placeholder="seu@email.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {tempPass && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-1">Sua senha temporária:</p>
+                      <p className="text-2xl font-mono font-black text-emerald-800 tracking-wider">{tempPass}</p>
+                      <p className="text-[10px] text-emerald-600 mt-2 font-medium">Use esta senha para entrar e alterá-la em seguida.</p>
+                    </div>
                   )}
-                </button>
-              </form>
-            </>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {loading ? (
+                      <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        {tempPass ? 'Gerar Nova Senha' : 'Recuperar Senha'}
+                        <ArrowRight size={20} />
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgot(false);
+                      setTempPass('');
+                    }}
+                    className="w-full text-slate-500 font-bold text-sm hover:text-slate-700 transition-colors"
+                  >
+                    Voltar para o Login
+                  </button>
+                </form>
+              </>
+            )
           ) : (
             <>
               <div className="text-center mb-10">
@@ -524,6 +615,7 @@ const ToastContainer = ({ toasts, onRemove }: { toasts: any[], onRemove: (id: nu
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ alunos: 0, financeiro: 0, turmas: 0, inadimplencia: 0 });
+  const [globalStats, setGlobalStats] = useState({ totalEmpresas: 0, totalAlunos: 0, totalUsuarios: 0, totalFinanceiro: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
   const [alunoData, setAlunoData] = useState<any>(null);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
@@ -532,9 +624,15 @@ const Dashboard = () => {
   const [turmas, setTurmas] = useState<any[]>([]);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = user.perfil === 'admin';
+  const isSuperAdmin = !!user.super_admin;
 
   const fetchData = async () => {
     try {
+      if (isSuperAdmin) {
+        const res = await api.get('/system/stats');
+        setGlobalStats(res.data);
+      }
+
       if (user.perfil === 'aluno') {
         const res = await api.get(`/portal-aluno/${user.aluno_id}`);
         setAlunoData(res.data);
@@ -599,6 +697,92 @@ const Dashboard = () => {
       alert('Erro ao realizar matrícula');
     }
   };
+
+  if (isSuperAdmin) {
+    return (
+      <div className="space-y-10">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-4xl font-black text-slate-800 tracking-tight">Painel Master</h1>
+            <p className="text-slate-500 mt-2 font-medium">Visão geral de todo o ecossistema EduManager</p>
+          </div>
+          <div className="flex items-center gap-3">
+             <Link to="/escolas" className="bg-amber-500 text-white px-8 py-4 rounded-2xl font-bold shadow-xl shadow-amber-500/20 hover:bg-amber-600 transition-all flex items-center gap-3 active:scale-95">
+               <School size={22} />
+               Gerenciar Escolas
+             </Link>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col gap-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+            <div className="bg-amber-100 text-amber-600 w-14 h-14 rounded-2xl flex items-center justify-center relative z-10">
+              <School size={28} />
+            </div>
+            <div className="relative z-10">
+              <span className="text-slate-500 font-bold text-sm uppercase tracking-wider">Total de Escolas</span>
+              <h3 className="text-4xl font-black text-slate-800 mt-2">{globalStats.totalEmpresas}</h3>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col gap-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+            <div className="bg-blue-100 text-blue-600 w-14 h-14 rounded-2xl flex items-center justify-center relative z-10">
+              <Users size={28} />
+            </div>
+            <div className="relative z-10">
+              <span className="text-slate-500 font-bold text-sm uppercase tracking-wider">Total de Alunos</span>
+              <h3 className="text-4xl font-black text-slate-800 mt-2">{globalStats.totalAlunos}</h3>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col gap-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+            <div className="bg-indigo-100 text-indigo-600 w-14 h-14 rounded-2xl flex items-center justify-center relative z-10">
+              <ShieldCheck size={28} />
+            </div>
+            <div className="relative z-10">
+              <span className="text-slate-500 font-bold text-sm uppercase tracking-wider">Total de Usuários</span>
+              <h3 className="text-4xl font-black text-slate-800 mt-2">{globalStats.totalUsuarios}</h3>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col gap-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+            <div className="bg-emerald-100 text-emerald-600 w-14 h-14 rounded-2xl flex items-center justify-center relative z-10">
+              <DollarSign size={28} />
+            </div>
+            <div className="relative z-10">
+              <span className="text-slate-500 font-bold text-sm uppercase tracking-wider">Receita Global</span>
+              <h3 className="text-3xl font-black text-slate-800 mt-2">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(globalStats.totalFinanceiro)}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900 rounded-[3rem] p-12 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-48 -mt-48" />
+          <div className="relative z-10 max-w-2xl">
+            <h2 className="text-3xl font-black mb-4">Bem-vindo ao Centro de Controle Master</h2>
+            <p className="text-slate-400 text-lg leading-relaxed mb-8">
+              Como Administrador Master, você tem controle total sobre todas as instâncias do sistema. 
+              Gerencie escolas, monitore o crescimento global e garanta a integridade de todo o ecossistema EduManager.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <Link to="/escolas" className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all">
+                Configurar Unidades
+              </Link>
+              <Link to="/configuracoes" className="bg-white/10 text-white px-8 py-4 rounded-2xl font-bold hover:bg-white/20 transition-all backdrop-blur-sm">
+                Configurações Globais
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (user.perfil === 'aluno') {
     if (!alunoData) return <div className="p-10 text-slate-500">Carregando portal...</div>;
