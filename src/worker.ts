@@ -119,7 +119,12 @@ CREATE TABLE IF NOT EXISTS empresas (
   msg_cobranca_whatsapp TEXT,
   msg_cobranca_email TEXT,
   cor_primaria TEXT DEFAULT '#4f46e5',
-  tema TEXT DEFAULT 'light'
+  tema TEXT DEFAULT 'light',
+  smtp_host TEXT,
+  smtp_port INTEGER,
+  smtp_user TEXT,
+  smtp_pass TEXT,
+  smtp_from TEXT
 );
 CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -897,6 +902,14 @@ app.get('/api/health', async (c) => {
         const res = await db.prepare("INSERT INTO empresas (nome, cnpj, endereco, telefone, email) VALUES (?, ?, ?, ?, ?)").run(nome, cnpj, endereco, telefone, email);
         const empresaId = res.lastInsertRowid;
 
+        // Ensure usuarios table has reset_token columns (in case init-db was run before they were added)
+        try {
+          await db.exec("ALTER TABLE usuarios ADD COLUMN reset_token TEXT");
+        } catch (e) {}
+        try {
+          await db.exec("ALTER TABLE usuarios ADD COLUMN reset_token_expires DATETIME");
+        } catch (e) {}
+
         // Create admin user for this school if credentials provided
         if (admin_email && admin_senha) {
           const hash = bcrypt.hashSync(admin_senha, 10);
@@ -913,14 +926,24 @@ app.get('/api/health', async (c) => {
     app.put('/api/empresas/:id', auth, async (c) => {
       if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const db = new DBWrapper(c.env.DB);
-      const { nome, cnpj, endereco, telefone, email, cor_primaria, tema, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email } = await c.req.json();
+      const { 
+        nome, cnpj, endereco, telefone, email, cor_primaria, tema, 
+        diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email,
+        smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from
+      } = await c.req.json();
       await db.prepare(`
         UPDATE empresas SET 
           nome = ?, cnpj = ?, endereco = ?, telefone = ?, email = ?, 
           cor_primaria = ?, tema = ?, diretor = ?, secretario = ?, 
-          logo_url = ?, msg_cobranca_whatsapp = ?, msg_cobranca_email = ?
+          logo_url = ?, msg_cobranca_whatsapp = ?, msg_cobranca_email = ?,
+          smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?, smtp_from = ?
         WHERE id = ?
-      `).run(nome, cnpj, endereco, telefone, email, cor_primaria, tema, diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email, c.req.param('id'));
+      `).run(
+        nome, cnpj, endereco, telefone, email, cor_primaria, tema, 
+        diretor, secretario, logo_url, msg_cobranca_whatsapp, msg_cobranca_email,
+        smtp_host, toInt(smtp_port), smtp_user, smtp_pass, smtp_from,
+        c.req.param('id')
+      );
       return c.json({ success: true });
     });
 
