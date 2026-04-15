@@ -319,19 +319,58 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [tempPass, setTempPass] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [step, setStep] = useState<'email' | 'code' | 'newPassword'>('email');
+  const [debugCode, setDebugCode] = useState('');
   const navigate = useNavigate();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTempPass('');
     try {
       const res = await api.post('/forgot-password', { email: forgotEmail });
       addToast(res.data.message, 'success');
-      setTempPass(res.data.tempPassword);
+      if (res.data.debugCode) setDebugCode(res.data.debugCode);
+      setStep('code');
     } catch (err: any) {
       addToast(err.response?.data?.error || 'Erro ao processar solicitação', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/verify-reset-code', { email: forgotEmail, code: resetCode });
+      addToast('Código verificado com sucesso!', 'success');
+      setStep('newPassword');
+    } catch (err: any) {
+      addToast(err.response?.data?.error || 'Código inválido ou expirado', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (novaSenha !== confirmarSenha) {
+      addToast('As senhas não coincidem', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/reset-password-with-code', { email: forgotEmail, code: resetCode, novaSenha });
+      addToast('Senha alterada com sucesso!', 'success');
+      setShowForgot(false);
+      setStep('email');
+      setForgotEmail('');
+      setResetCode('');
+      setNovaSenha('');
+      setConfirmarSenha('');
+    } catch (err: any) {
+      addToast(err.response?.data?.error || 'Erro ao alterar senha', 'error');
     } finally {
       setLoading(false);
     }
@@ -478,59 +517,152 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
               <>
                 <div className="text-center mb-10">
                   <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3">Recuperar Senha</h2>
-                  <p className="text-slate-500 font-medium">Informe seu e-mail para receber uma senha temporária</p>
+                  <p className="text-slate-500 font-medium">
+                    {step === 'email' && 'Informe seu e-mail para receber o código'}
+                    {step === 'code' && 'Informe o código de 6 dígitos enviado'}
+                    {step === 'newPassword' && 'Defina sua nova senha de acesso'}
+                  </p>
                 </div>
 
-                <form onSubmit={handleForgotPassword} className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Institucional</label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                {step === 'email' && (
+                  <form onSubmit={handleForgotPassword} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">E-mail Institucional</label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                          type="email"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                          placeholder="seu@email.com"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                      {loading ? (
+                        <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          Enviar Código
+                          <ArrowRight size={20} />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+
+                {step === 'code' && (
+                  <form onSubmit={handleVerifyCode} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Código de Recuperação</label>
+                      <div className="relative">
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={resetCode}
+                          onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                          className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium text-center text-2xl tracking-[0.5em]"
+                          placeholder="000000"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {debugCode && (
+                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">Simulação de E-mail (Debug):</p>
+                        <p className="text-xl font-mono font-black text-amber-800 tracking-wider">{debugCode}</p>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                      {loading ? (
+                        <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          Verificar Código
+                          <ArrowRight size={20} />
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setStep('email')}
+                      className="w-full text-indigo-600 font-bold text-xs hover:underline"
+                    >
+                      Não recebeu? Tentar novamente
+                    </button>
+                  </form>
+                )}
+
+                {step === 'newPassword' && (
+                  <form onSubmit={handleResetPassword} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nova Senha</label>
                       <input
-                        type="email"
-                        value={forgotEmail}
-                        onChange={(e) => setForgotEmail(e.target.value)}
-                        className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
-                        placeholder="seu@email.com"
+                        type="password"
+                        value={novaSenha}
+                        onChange={(e) => setNovaSenha(e.target.value)}
+                        className="w-full px-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                        placeholder="Mínimo 6 caracteres"
                         required
                       />
                     </div>
-                  </div>
-
-                  {tempPass && (
-                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
-                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-1">Sua senha temporária:</p>
-                      <p className="text-2xl font-mono font-black text-emerald-800 tracking-wider">{tempPass}</p>
-                      <p className="text-[10px] text-emerald-600 mt-2 font-medium">Use esta senha para entrar e alterá-la em seguida.</p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Confirmar Nova Senha</label>
+                      <input
+                        type="password"
+                        value={confirmarSenha}
+                        onChange={(e) => setConfirmarSenha(e.target.value)}
+                        className="w-full px-4 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-medium"
+                        placeholder="Repita a senha"
+                        required
+                      />
                     </div>
-                  )}
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-                  >
-                    {loading ? (
-                      <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        {tempPass ? 'Gerar Nova Senha' : 'Recuperar Senha'}
-                        <ArrowRight size={20} />
-                      </>
-                    )}
-                  </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                      {loading ? (
+                        <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          Alterar Senha
+                          <ArrowRight size={20} />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
 
+                <div className="mt-8">
                   <button
                     type="button"
                     onClick={() => {
                       setShowForgot(false);
-                      setTempPass('');
+                      setStep('email');
+                      setDebugCode('');
                     }}
                     className="w-full text-slate-500 font-bold text-sm hover:text-slate-700 transition-colors"
                   >
                     Voltar para o Login
                   </button>
-                </form>
+                </div>
               </>
             )
           ) : (
