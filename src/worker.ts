@@ -444,7 +444,7 @@ app.get('/api/health', async (c) => {
 
     // API Routes
     app.post('/api/login', async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
 
       const { email, senha } = await c.req.json();
       const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
@@ -480,6 +480,25 @@ app.get('/api/health', async (c) => {
       });
     });
 
+    app.post('/api/forgot-password', async (c) => {
+      const db = new DBWrapper(c.env.DB);
+      const { email } = await c.req.json();
+      const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email) as any;
+      if (!user) return c.json({ error: 'E-mail não encontrado' }, 404);
+      
+      // Para este sistema, vamos resetar para uma senha temporária e retornar
+      const tempPassword = Math.random().toString(36).slice(-8);
+      const hash = bcrypt.hashSync(tempPassword, 10);
+      
+      await db.prepare("UPDATE usuarios SET senha = ?, primeiro_acesso = 1 WHERE id = ?").run(hash, user.id);
+      
+      return c.json({ 
+        success: true, 
+        message: 'Sua senha foi resetada temporariamente. Use a senha abaixo para acessar e alterá-la no primeiro acesso.',
+        tempPassword 
+      });
+    });
+
     app.post('/api/change-password', auth, async (c) => {
   const db = new DBWrapper(c.env.DB);
 
@@ -492,12 +511,25 @@ app.get('/api/health', async (c) => {
     app.post('/api/usuarios/reset-password', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const user = c.get('user');
-      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
       
       const { usuario_id, nova_senha } = await c.req.json();
       const targetId = toInt(usuario_id);
       
       if (!targetId) return c.json({ error: 'ID de usuário inválido' }, 400);
+
+      // Check if target is super admin
+      const targetUser = await db.prepare("SELECT super_admin FROM usuarios WHERE id = ?").get(targetId) as any;
+      if (targetUser?.super_admin === 1 && !user.super_admin) {
+        return c.json({ error: 'Acesso negado: Não é possível resetar senha de um Administrador Master' }, 403);
+      }
+
+      let hasPermission = user.perfil === 'admin' || user.super_admin;
+      if (!hasPermission) {
+        const perm = await db.prepare("SELECT pode_editar FROM permissoes WHERE usuario_id = ? AND empresa_id = ? AND tela = 'Acesso'").get(user.id, user.empresa_id) as any;
+        if (perm && perm.pode_editar === 1) hasPermission = true;
+      }
+      if (!hasPermission) return c.json({ error: 'Acesso negado' }, 403);
+      
       if (!nova_senha || nova_senha.length < 6) return c.json({ error: 'Senha muito curta' }, 400);
       
       const hash = bcrypt.hashSync(nova_senha, 10);
@@ -516,9 +548,16 @@ app.get('/api/health', async (c) => {
     });
 
     app.post('/api/usuarios/criar', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
       const user = c.get('user');
-      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      
+      let hasPermission = user.perfil === 'admin' || user.super_admin;
+      if (!hasPermission) {
+        const perm = await db.prepare("SELECT pode_editar FROM permissoes WHERE usuario_id = ? AND empresa_id = ? AND tela = 'Acesso'").get(user.id, user.empresa_id) as any;
+        if (perm && perm.pode_editar === 1) hasPermission = true;
+      }
+      if (!hasPermission) return c.json({ error: 'Acesso negado' }, 403);
+      
       const data = await c.req.json();
       const { nome, email, senha, perfil } = data;
       const aluno_id = toInt(data.aluno_id);
@@ -543,7 +582,21 @@ app.get('/api/health', async (c) => {
     app.put('/api/usuarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const user = c.get('user');
-      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
+      const targetId = toInt(c.req.param('id'));
+
+      // Check if target is super admin
+      const targetUser = await db.prepare("SELECT super_admin FROM usuarios WHERE id = ?").get(targetId) as any;
+      if (targetUser?.super_admin === 1 && !user.super_admin) {
+        return c.json({ error: 'Acesso negado: Não é possível editar um Administrador Master' }, 403);
+      }
+      
+      let hasPermission = user.perfil === 'admin' || user.super_admin;
+      if (!hasPermission) {
+        const perm = await db.prepare("SELECT pode_editar FROM permissoes WHERE usuario_id = ? AND empresa_id = ? AND tela = 'Acesso'").get(user.id, user.empresa_id) as any;
+        if (perm && perm.pode_editar === 1) hasPermission = true;
+      }
+      if (!hasPermission) return c.json({ error: 'Acesso negado' }, 403);
+      
       const data = await c.req.json();
       const { nome, email, perfil, status } = data;
       const curso_id = toInt(data.curso_id);
@@ -561,7 +614,19 @@ app.get('/api/health', async (c) => {
       const db = new DBWrapper(c.env.DB);
       const user = c.get('user');
       const id = toInt(c.req.param('id'));
-      if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
+
+      // Check if target is super admin
+      const targetUser = await db.prepare("SELECT super_admin FROM usuarios WHERE id = ?").get(id) as any;
+      if (targetUser?.super_admin === 1 && !user.super_admin) {
+        return c.json({ error: 'Acesso negado: Não é possível excluir um Administrador Master' }, 403);
+      }
+      
+      let hasPermission = user.perfil === 'admin' || user.super_admin;
+      if (!hasPermission) {
+        const perm = await db.prepare("SELECT pode_excluir FROM permissoes WHERE usuario_id = ? AND empresa_id = ? AND tela = 'Acesso'").get(user.id, user.empresa_id) as any;
+        if (perm && perm.pode_excluir === 1) hasPermission = true;
+      }
+      if (!hasPermission) return c.json({ error: 'Acesso negado' }, 403);
       
       // Delete permissions first
       await db.prepare("DELETE FROM permissoes WHERE usuario_id = ? AND empresa_id = ?").run(id, user.empresa_id);
@@ -1000,7 +1065,15 @@ app.get('/api/health', async (c) => {
     });
 
     app.post('/api/permissoes', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
+      const user = c.get('user');
+      
+      let hasPermission = user.perfil === 'admin' || user.super_admin;
+      if (!hasPermission) {
+        const perm = await db.prepare("SELECT pode_editar FROM permissoes WHERE usuario_id = ? AND empresa_id = ? AND tela = 'Acesso'").get(user.id, user.empresa_id) as any;
+        if (perm && perm.pode_editar === 1) hasPermission = true;
+      }
+      if (!hasPermission) return c.json({ error: 'Acesso negado' }, 403);
 
       const { usuario_id, tela, pode_acessar, pode_editar, pode_excluir } = await c.req.json();
       const existing = await db.prepare("SELECT id FROM permissoes WHERE usuario_id = ? AND tela = ? AND empresa_id = ?").get(usuario_id, tela, c.get('user').empresa_id) as any;
@@ -1020,9 +1093,18 @@ app.get('/api/health', async (c) => {
     });
 
     app.get('/api/usuarios', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
+      const user = c.get('user');
 
-      const rows = await db.prepare("SELECT id, nome, email, perfil, aluno_id, professor_id, funcionario_id FROM usuarios WHERE empresa_id = ?").all(c.get('user').empresa_id);
+      let query = "SELECT id, nome, email, perfil, aluno_id, professor_id, funcionario_id, super_admin FROM usuarios WHERE empresa_id = ?";
+      let params: any[] = [user.empresa_id];
+
+      // Se não for super admin, não vê outros super admins
+      if (!user.super_admin) {
+        query += " AND (super_admin = 0 OR super_admin IS NULL)";
+      }
+
+      const rows = await db.prepare(query).all(...params);
       return c.json(rows);
     });
 
@@ -1200,6 +1282,26 @@ app.get('/api/health', async (c) => {
       await db.prepare("DELETE FROM turmas WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
       
       return c.json({ success: true });
+    });
+
+    app.get('/api/system/stats', auth, async (c) => {
+      if (!c.get('user').super_admin) {
+        return c.json({ error: 'Acesso negado' }, 403);
+      }
+      const db = new DBWrapper(c.env.DB);
+      const [empresas, alunos, usuarios, financeiro] = await Promise.all([
+        db.prepare("SELECT COUNT(*) as count FROM empresas").get() as any,
+        db.prepare("SELECT COUNT(*) as count FROM alunos").get() as any,
+        db.prepare("SELECT COUNT(*) as count FROM usuarios").get() as any,
+        db.prepare("SELECT SUM(valor) as total FROM financeiro").get() as any
+      ]);
+      
+      return c.json({
+        totalEmpresas: empresas.count,
+        totalAlunos: alunos.count,
+        totalUsuarios: usuarios.count,
+        totalFinanceiro: financeiro.total || 0
+      });
     });
 
     app.post('/api/system/reset-db', auth, async (c) => {
