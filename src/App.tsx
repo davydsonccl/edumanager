@@ -335,7 +335,6 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [step, setStep] = useState<'email' | 'code' | 'newPassword'>('email');
-  const [debugCode, setDebugCode] = useState('');
   const navigate = useNavigate();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -344,7 +343,6 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
     try {
       const res = await api.post('/forgot-password', { email: forgotEmail });
       addToast(res.data.message, 'success');
-      if (res.data.debugCode) setDebugCode(res.data.debugCode);
       setStep('code');
     } catch (err: any) {
       addToast(err.response?.data?.error || 'Erro ao processar solicitação', 'error');
@@ -590,13 +588,6 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
                       </div>
                     </div>
 
-                    {debugCode && (
-                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">Simulação de E-mail (Debug):</p>
-                        <p className="text-xl font-mono font-black text-amber-800 tracking-wider">{debugCode}</p>
-                      </div>
-                    )}
-
                     <button
                       type="submit"
                       disabled={loading}
@@ -670,7 +661,6 @@ const Login = ({ addToast }: { addToast: (m: string, t?: any) => void }) => {
                     onClick={() => {
                       setShowForgot(false);
                       setStep('email');
-                      setDebugCode('');
                     }}
                     className="w-full text-slate-500 font-bold text-sm hover:text-slate-700 transition-colors"
                   >
