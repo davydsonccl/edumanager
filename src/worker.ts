@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   empresa_id INTEGER,
   aluno_id INTEGER,
   professor_id INTEGER,
+  funcionario_id INTEGER,
   curso_id INTEGER,
   turma_id INTEGER,
   ano_letivo INTEGER,
@@ -559,8 +560,14 @@ app.get('/api/health', async (c) => {
     app.delete('/api/usuarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
       const user = c.get('user');
+      const id = toInt(c.req.param('id'));
       if (user.perfil !== 'admin' && !user.super_admin) return c.json({ error: 'Acesso negado' }, 403);
-      await db.prepare("DELETE FROM usuarios WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), user.empresa_id);
+      
+      // Delete permissions first
+      await db.prepare("DELETE FROM permissoes WHERE usuario_id = ? AND empresa_id = ?").run(id, user.empresa_id);
+      // Then delete user
+      await db.prepare("DELETE FROM usuarios WHERE id = ? AND empresa_id = ?").run(id, user.empresa_id);
+      
       return c.json({ success: true });
     });
 
@@ -809,7 +816,22 @@ app.get('/api/health', async (c) => {
     app.delete('/api/empresas/:id', auth, async (c) => {
       if (!c.get('user').super_admin) return c.json({ error: 'Acesso negado' }, 403);
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM empresas WHERE id = ?").run(c.req.param('id'));
+      const empresa_id = toInt(c.req.param('id'));
+
+      // Cascading delete for all tables related to this empresa
+      const tables = [
+        'usuarios', 'cursos', 'disciplinas', 'turmas', 
+        'alunos', 'matriculas', 'notas', 'frequencias', 
+        'historico_remanejamentos', 'financeiro', 'comunicados', 
+        'comunicados_lidos', 'solicitacoes_documentos', 'solicitacoes_financeiras',
+        'funcionarios', 'permissoes', 'professor_vinculos', 'professores', 'transferencias'
+      ];
+
+      for (const table of tables) {
+        await db.prepare(`DELETE FROM ${table} WHERE empresa_id = ?`).run(empresa_id);
+      }
+
+      await db.prepare("DELETE FROM empresas WHERE id = ?").run(empresa_id);
       return c.json({ success: true });
     });
 
@@ -945,7 +967,8 @@ app.get('/api/health', async (c) => {
 
     app.delete('/api/professor-vinculos/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM professor_vinculos WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const id = toInt(c.req.param('id'));
+      await db.prepare("DELETE FROM professor_vinculos WHERE id = ? AND empresa_id = ?").run(id, c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -976,7 +999,22 @@ app.get('/api/health', async (c) => {
 
     app.delete('/api/funcionarios/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM funcionarios WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const id = toInt(c.req.param('id'));
+      const empresa_id = c.get('user').empresa_id;
+
+      // 1. Delete professor vinculos
+      await db.prepare("DELETE FROM professor_vinculos WHERE funcionario_id = ? AND empresa_id = ?").run(id, empresa_id);
+      
+      // 2. Delete linked user and their permissions
+      const linkedUser = await db.prepare("SELECT id FROM usuarios WHERE (professor_id = ? OR funcionario_id = ?) AND empresa_id = ?").get(id, id, empresa_id) as any;
+      if (linkedUser) {
+        await db.prepare("DELETE FROM permissoes WHERE usuario_id = ? AND empresa_id = ?").run(linkedUser.id, empresa_id);
+        await db.prepare("DELETE FROM usuarios WHERE id = ? AND empresa_id = ?").run(linkedUser.id, empresa_id);
+      }
+
+      // 3. Delete the funcionario
+      await db.prepare("DELETE FROM funcionarios WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
+      
       return c.json({ success: true });
     });
 
@@ -1100,25 +1138,94 @@ app.get('/api/health', async (c) => {
 
     app.delete('/api/alunos/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM alunos WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const id = toInt(c.req.param('id'));
+      const empresa_id = c.get('user').empresa_id;
+
+      // 1. Delete linked user and their permissions
+      const linkedUser = await db.prepare("SELECT id FROM usuarios WHERE aluno_id = ? AND empresa_id = ?").get(id, empresa_id) as any;
+      if (linkedUser) {
+        await db.prepare("DELETE FROM permissoes WHERE usuario_id = ? AND empresa_id = ?").run(linkedUser.id, empresa_id);
+        await db.prepare("DELETE FROM usuarios WHERE id = ? AND empresa_id = ?").run(linkedUser.id, empresa_id);
+      }
+
+      // 2. Delete related records in other tables
+      const tables = [
+        'matriculas', 'notas', 'frequencias', 'financeiro', 
+        'solicitacoes_documentos', 'solicitacoes_financeiras', 
+        'historico_remanejamentos', 'transferencias'
+      ];
+      for (const table of tables) {
+        await db.prepare(`DELETE FROM ${table} WHERE aluno_id = ? AND empresa_id = ?`).run(id, empresa_id);
+      }
+
+      // 3. Delete the aluno
+      await db.prepare("DELETE FROM alunos WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
+      
       return c.json({ success: true });
     });
 
     app.delete('/api/cursos/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM cursos WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const id = toInt(c.req.param('id'));
+      const empresa_id = c.get('user').empresa_id;
+
+      // 1. Get all turmas for this curso
+      const turmas = await db.prepare("SELECT id FROM turmas WHERE curso_id = ? AND empresa_id = ?").all(id, empresa_id);
+      const turmaIds = turmas.map((t: any) => t.id);
+
+      if (turmaIds.length > 0) {
+        const placeholders = turmaIds.map(() => '?').join(',');
+        // Unlink students from these turmas
+        await db.prepare(`UPDATE alunos SET turma_id = NULL WHERE turma_id IN (${placeholders}) AND empresa_id = ?`).run(...turmaIds, empresa_id);
+        // Delete turmas
+        await db.prepare(`DELETE FROM turmas WHERE id IN (${placeholders}) AND empresa_id = ?`).run(...turmaIds, empresa_id);
+      }
+
+      // 2. Delete disciplines
+      await db.prepare("DELETE FROM disciplinas WHERE curso_id = ? AND empresa_id = ?").run(id, empresa_id);
+
+      // 3. Delete the curso
+      await db.prepare("DELETE FROM cursos WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
+      
       return c.json({ success: true });
     });
 
     app.delete('/api/disciplinas/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM disciplinas WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const id = toInt(c.req.param('id'));
+      const empresa_id = c.get('user').empresa_id;
+
+      // 1. Delete professor vinculos
+      await db.prepare("DELETE FROM professor_vinculos WHERE disciplina_id = ? AND empresa_id = ?").run(id, empresa_id);
+      
+      // 2. Delete related notes and frequencies
+      await db.prepare("DELETE FROM notas WHERE disciplina_id = ? AND empresa_id = ?").run(id, empresa_id);
+      await db.prepare("DELETE FROM frequencias WHERE disciplina_id = ? AND empresa_id = ?").run(id, empresa_id);
+
+      // 3. Delete the disciplina
+      await db.prepare("DELETE FROM disciplinas WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
+      
       return c.json({ success: true });
     });
 
     app.delete('/api/turmas/:id', auth, async (c) => {
       const db = new DBWrapper(c.env.DB);
-      await db.prepare("DELETE FROM turmas WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const id = toInt(c.req.param('id'));
+      const empresa_id = c.get('user').empresa_id;
+
+      // 1. Unlink students
+      await db.prepare("UPDATE alunos SET turma_id = NULL WHERE turma_id = ? AND empresa_id = ?").run(id, empresa_id);
+      
+      // 2. Delete professor vinculos
+      await db.prepare("DELETE FROM professor_vinculos WHERE turma_id = ? AND empresa_id = ?").run(id, empresa_id);
+
+      // 3. Delete related notes and frequencies
+      await db.prepare("DELETE FROM notas WHERE turma_id = ? AND empresa_id = ?").run(id, empresa_id);
+      await db.prepare("DELETE FROM frequencias WHERE turma_id = ? AND empresa_id = ?").run(id, empresa_id);
+
+      // 4. Delete the turma
+      await db.prepare("DELETE FROM turmas WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
+      
       return c.json({ success: true });
     });
 
@@ -1458,9 +1565,9 @@ app.get('/api/health', async (c) => {
     });
 
     app.delete('/api/financeiro/:id', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
-
-      await db.prepare("DELETE FROM financeiro WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      const db = new DBWrapper(c.env.DB);
+      const id = toInt(c.req.param('id'));
+      await db.prepare("DELETE FROM financeiro WHERE id = ? AND empresa_id = ?").run(id, c.get('user').empresa_id);
       return c.json({ success: true });
     });
 
@@ -1490,9 +1597,15 @@ app.get('/api/health', async (c) => {
     });
 
     app.delete('/api/comunicados/:id', auth, async (c) => {
-  const db = new DBWrapper(c.env.DB);
+      const db = new DBWrapper(c.env.DB);
+      const id = toInt(c.req.param('id'));
+      const empresa_id = c.get('user').empresa_id;
 
-      await db.prepare("DELETE FROM comunicados WHERE id = ? AND empresa_id = ?").run(c.req.param('id'), c.get('user').empresa_id);
+      // Delete read status first
+      await db.prepare("DELETE FROM comunicados_lidos WHERE comunicado_id = ?").run(id);
+      // Then delete comunicado
+      await db.prepare("DELETE FROM comunicados WHERE id = ? AND empresa_id = ?").run(id, empresa_id);
+      
       return c.json({ success: true });
     });
 
