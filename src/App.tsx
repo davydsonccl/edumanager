@@ -3707,7 +3707,7 @@ const Alunos = () => {
         telefone: '', email: '', problemas_saude: [], 
         problemas_saude_outros: '', uso_medicamentos: false, medicamentos_quais: '',
         turma_id: '', fileira: '', assento: '',
-        whatsapp_pais_codigo: '+55', whatsapp_ddd: '', whatsapp_numero: '',
+        whatsapp_pais_codigo: '',
         email_responsavel: '',
         matricula: '', nis: '', cor_raca: '', deficiencia: false, deficiencia_tipo: '',
         nacionalidade: 'Brasileira', certidao_nascimento: '', pais_origem: 'Brasil', municipio_nascimento: '',
